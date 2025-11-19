@@ -223,14 +223,12 @@ if __name__ == "__main__":
         """Test FastAPI Depends integration."""
         print("\n=== Test: FastAPI Integration ===")
         from fastapi.testclient import TestClient
-        from fastapi import Depends as FastAPIDepends, Path
+        from fastapi import Path
 
         class RequestScopedInjectable:
             def __init__(self, req: Request, name: str = Path()):
                 self.req = req
                 self.name = name
-                print("RequestScopedInjectable created with name: ", name)
-                print("req.scope: ", req.scope)
 
         class DBConnection:
             def connect(self):
@@ -239,20 +237,18 @@ if __name__ == "__main__":
         def get_db_connection() -> DBConnection:
             return DBConnection()
 
-        @injectable
+        @injectable(scope=Scopes.SINGLETON)
         class ConfigService:
             def __init__(self):
                 self.app_name = "TestApp"
 
-        @injectable
+        @injectable(scope=Scopes.SINGLETON)
         class GreetingService:
             def __init__(
                 self,
                 config: ConfigService,
+                request_scoped_injectable: RequestScopedInjectable,
                 db_connection: DBConnection = Depends(get_db_connection),
-                request_scoped_injectable: RequestScopedInjectable = Depends(
-                    RequestScopedInjectable
-                ),
             ):
                 self.config = config
                 self.db_connection = db_connection
