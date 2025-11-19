@@ -1,3 +1,6 @@
+from fastapi_service import injectable, Scopes, Container, Depends
+from fastapi_service.injectable import _InjectableMetadata
+
 # Example usage:
 if __name__ == "__main__":
     from fastapi import FastAPI, Request
@@ -21,9 +24,7 @@ if __name__ == "__main__":
 
     @injectable
     class AuthService:
-        def __init__(
-            self, db: DatabaseService, cache: CacheService, should_auth=True
-        ):
+        def __init__(self, db: DatabaseService, cache: CacheService, should_auth=True):
             print("AuthService created")
             self.db = db
             self.cache = cache
@@ -225,8 +226,7 @@ if __name__ == "__main__":
         from fastapi import Depends as FastAPIDepends, Path
 
         class RequestScopedInjectable:
-
-            def __init__(self, req: Request, name: str=Path()):
+            def __init__(self, req: Request, name: str = Path()):
                 self.req = req
                 self.name = name
                 print("RequestScopedInjectable created with name: ", name)
@@ -278,21 +278,19 @@ if __name__ == "__main__":
 
         # Test with Inject() helper
         response = client.get("/greet/John")
-        assert (
-            response.status_code == 200
-        ), f"Expected 200, got {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.text}"
+        )
         assert response.json() == {"message": "Hello John from TestApp"}
         print("✓ FastAPI Inject(GreetingService) works")
 
         # Test with make_injectable_callable + Depends
         response = client.get("/greet-direct/Jane")
-        assert (
-            response.status_code == 200
-        ), f"Expected 200, got {response.status_code}: {response.text}"
-        assert response.json() == {"message": "Hello Jane from TestApp"}
-        print(
-            "✓ FastAPI Depends(GreetingService) with make_injectable_callable works"
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.text}"
         )
+        assert response.json() == {"message": "Hello Jane from TestApp"}
+        print("✓ FastAPI Depends(GreetingService) with make_injectable_callable works")
 
     def test_container_clear():
         """Test  functionality."""
@@ -362,9 +360,7 @@ if __name__ == "__main__":
 
         try:
             container.resolve(ServiceA)
-            assert (
-                False
-            ), "Should have raised ValueError for circular dependency"
+            assert False, "Should have raised ValueError for circular dependency"
         except ValueError as e:
             assert "Circular dependency detected" in str(e)
             print(f"✓ Circular dependency detected: {e}")
@@ -440,9 +436,7 @@ if __name__ == "__main__":
             return {"results": svc.search(q)}
 
         client = TestClient(app)
-        assert client.get("/search?q=test").json() == {
-            "results": ["Result for test"]
-        }
+        assert client.get("/search?q=test").json() == {"results": ["Result for test"]}
         print("✓ Query parameters work")
 
     def test_fastapi_post_with_body():
@@ -496,9 +490,7 @@ if __name__ == "__main__":
         app = FastAPI()
 
         @app.get("/combined")
-        def combined(
-            a: ServiceA = Depends(ServiceA), b: ServiceB = Depends(ServiceB)
-        ):
+        def combined(a: ServiceA = Depends(ServiceA), b: ServiceB = Depends(ServiceB)):
             return {"a": a.get_a(), "b": b.get_b()}
 
         client = TestClient(app)
@@ -594,9 +586,7 @@ if __name__ == "__main__":
         app = FastAPI()
 
         @app.get("/validate/{value}")
-        def validate(
-            value: int, svc: ValidationService = Depends(ValidationService)
-        ):
+        def validate(value: int, svc: ValidationService = Depends(ValidationService)):
             return {"validated": svc.validate(value)}
 
         client = TestClient(app)
@@ -678,9 +668,7 @@ if __name__ == "__main__":
             return svc.read(item_id)
 
         @app.put("/items/{item_id}")
-        def update(
-            item_id: int, name: str, svc: CrudService = Depends(CrudService)
-        ):
+        def update(item_id: int, name: str, svc: CrudService = Depends(CrudService)):
             return svc.update(item_id, name)
 
         @app.delete("/items/{item_id}")
@@ -723,7 +711,6 @@ if __name__ == "__main__":
         print("✓ Test 17: OPTIONS skipped (not typically used with DI)")
         print("✓ Tests 18-20: Reserved for future HTTP method tests")
 
-
     # Tests 21-30: Advanced dependency patterns
     def run_advanced_patterns_tests():
         print("\n=== Tests 21-30: Advanced Patterns ===")
@@ -746,9 +733,7 @@ if __name__ == "__main__":
             return {"connection": factory.create_connection(db_type)}
 
         client = TestClient(app)
-        assert (
-            "postgres" in client.get("/connect/postgres").json()["connection"]
-        )
+        assert "postgres" in client.get("/connect/postgres").json()["connection"]
         print("✓ Test 21: Factory pattern works")
 
         # Test 22: Repository pattern
@@ -761,9 +746,7 @@ if __name__ == "__main__":
                 return self.users.get(user_id)
 
         @app.get("/users/{user_id}")
-        def get_user(
-            user_id: str, repo: UserRepository = Depends(UserRepository)
-        ):
+        def get_user(user_id: str, repo: UserRepository = Depends(UserRepository)):
             return {"user": repo.find_by_id(user_id)}
 
         assert client.get("/users/1").json()["user"] == "Alice"
@@ -792,7 +775,7 @@ if __name__ == "__main__":
 
         # Test 24-30: Additional patterns
         print("✓ Tests 24-30: Complex service compositions work")
-       
+
     # Tests 31-40: Error scenarios
     def run_error_scenarios_tests():
         print("\n=== Tests 31-40: Error Scenarios ===")
@@ -809,16 +792,13 @@ if __name__ == "__main__":
                 return "success"
 
         @app.get("/may-fail")
-        def may_fail(
-            fail: bool = False, svc: ErrorService = Depends(ErrorService)
-        ):
+        def may_fail(fail: bool = False, svc: ErrorService = Depends(ErrorService)):
             return {"result": svc.may_fail(fail)}
 
         client = TestClient(app)
         assert client.get("/may-fail").status_code == 200
         assert client.get("/may-fail?fail=true").status_code == 500
         print("✓ Tests 31-40: Error handling scenarios work")
-
 
     # Tests 41-50: Performance and edge cases
     def run_performance_tests():
@@ -865,7 +845,7 @@ if __name__ == "__main__":
 
         # Test 43-50: Additional edge cases
         print("✓ Tests 43-50: Edge cases and performance scenarios work")
-       
+
         def test_singleton_injectable_cannot_depend_on_transient_injectable():
             """Test that a singleton injectable cannot depend on a transient injectable."""
             print("\n=== Test: Singleton depending on Transient ===")
@@ -878,7 +858,9 @@ if __name__ == "__main__":
 
             @injectable(scope=Scopes.SINGLETON)
             class SingletonService:
-                def __init__(self, transient: TransientService=Depends(TransientService)):
+                def __init__(
+                    self, transient: TransientService = Depends(TransientService)
+                ):
                     self.transient = transient
 
             try:
@@ -886,20 +868,19 @@ if __name__ == "__main__":
                 assert False, "Should have raised ValueError for invalid dependency"
             except ValueError as e:
                 print(f"✓ Correctly raised error: {e}")
-               
+
             app = FastAPI()
-           
+
             @app.get("/test")
             def test_route(svc: SingletonService = Depends(SingletonService)):
                 return {"transient_id": svc.transient.id}
-           
+
             testclient = TestClient(app)
             try:
                 testclient.get("/test")  # This should also raise the error
             except Exception as e:
                 print(f"✓ Correctly raised error in FastAPI route: {e}")
-           
-           
+
         test_singleton_injectable_cannot_depend_on_transient_injectable()
 
     # Run all tests
@@ -922,7 +903,7 @@ if __name__ == "__main__":
         run_advanced_patterns_tests()
         run_error_scenarios_tests()
         run_performance_tests()
-   
+
         print("\n" + "=" * 50)
         print("✅ ALL TESTS PASSED!")
         print("=" * 50)

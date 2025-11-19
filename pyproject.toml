@@ -11,3 +11,11 @@ dependencies = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "nox>=2025.11.12",
+]
+test = [
+    "httpx>=0.28.1",
+]
