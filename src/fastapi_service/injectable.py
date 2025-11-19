@@ -177,8 +177,10 @@ def injectable(
         type_hints = get_type_hints(_cls.__init__)
 
         dependencies = {}
-        for param_name, _ in init_signature.parameters.items():
+        for param_name, param in init_signature.parameters.items():
             if param_name == "self":
+                continue
+            if param.default is not inspect.Parameter.empty:
                 continue
             if param_name in type_hints:
                 dependencies[param_name] = type_hints[param_name]
