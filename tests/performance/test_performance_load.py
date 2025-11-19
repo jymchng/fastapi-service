@@ -1,6 +1,5 @@
 import time
 import statistics
-from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from fastapi_service import injectable, Depends, Scopes
@@ -63,6 +62,7 @@ def test_performance_scalability_thresholds(load_factor):
     class Counter:
         def __init__(self):
             self.c = 0
+
         def inc(self) -> int:
             self.c += 1
             return self.c

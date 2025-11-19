@@ -1,5 +1,6 @@
-import inspect
 from fastapi_service import injectable
+from fastapi_service.injectable import _InjectableMetadata
+from fastapi_service.enums import Scopes
 
 
 def test_container_auto_resolve_unregistered_class(container):
@@ -12,18 +13,31 @@ def test_container_auto_resolve_unregistered_class(container):
 
 
 def test_container_circular_dependency_detection(container):
-    @injectable
-    class A:
-        def __init__(self, b: "B"):
+    class ServiceA:
+        def __init__(self, b):
             self.b = b
 
-    @injectable
-    class B:
-        def __init__(self, a: A):
+    class ServiceB:
+        def __init__(self, a):
             self.a = a
 
+    metadata_a = _InjectableMetadata(
+        cls=ServiceA, scope=Scopes.SINGLETON, dependencies={"b": ServiceB}
+    )
+    metadata_b = _InjectableMetadata(
+        cls=ServiceB, scope=Scopes.SINGLETON, dependencies={"a": ServiceA}
+    )
+
+    ServiceA.__injectable_metadata__ = metadata_a
+    ServiceB.__injectable_metadata__ = metadata_b
+    metadata_a.original_init = ServiceA.__init__
+    metadata_b.original_init = ServiceB.__init__
+
+    container._registry[ServiceA] = metadata_a
+    container._registry[ServiceB] = metadata_b
+
     try:
-        container.resolve(A)
+        container.resolve(ServiceA)
         assert False
     except ValueError as e:
         assert "Circular dependency" in str(e)

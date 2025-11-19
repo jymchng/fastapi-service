@@ -53,6 +53,7 @@ def test_security_data_protection_no_secret_leak():
     class SecretSvc:
         def __init__(self):
             self.secret = "TOP_SECRET"
+
         def public(self):
             return "ok"
 

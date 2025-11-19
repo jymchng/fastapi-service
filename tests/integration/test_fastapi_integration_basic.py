@@ -1,4 +1,3 @@
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from fastapi_service import injectable, Depends, Scopes
 
@@ -26,6 +25,7 @@ def test_fastapi_nested_dependencies(app, client):
     class Cache:
         def __init__(self, db: Db):
             self.db = db
+
         def get(self):
             return f"cached:{self.db.query()}"
 
@@ -75,6 +75,7 @@ def test_fastapi_singleton_shared_across_routes(app, client):
     class Counter:
         def __init__(self):
             self.count = 0
+
         def inc(self):
             self.count += 1
             return self.count

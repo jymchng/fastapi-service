@@ -8,7 +8,6 @@ from typing import (
     overload,
     Union,
 )
-from dataclasses import dataclass, field
 import inspect
 import asyncio
 
@@ -16,7 +15,6 @@ from fastapi_service.enums import Scopes
 from fastapi_service.helpers import (
     _get_injectable_metadata,
     get_solved_dependencies,
-    _is_injectable_instance,
 )
 from fastapi_service.protocols import (
     ContainerProtocol,
@@ -82,7 +80,6 @@ class _InjectableMetadata:
         Returns:
             A new instance with all dependencies resolved and injected
         """
-        # Resolve dependencies using the container
         resolved_deps = {}
         req = additional_context.get(FASTAPI_REQUEST_KEY)
         if self.original_new is not object.__new__:
@@ -103,19 +100,15 @@ class _InjectableMetadata:
                     dep_type, additional_context
                 )
 
-            # Create instance using original __new__ (stored in metadata)
             instance = self.original_new(self.cls, **(resolved_deps))
         else:
-            # Create instance using original __new__ (stored in metadata)
             instance = self.original_new(self.cls)
 
         if not isinstance(instance, self.cls):
             return instance
 
-        # Call original __init__ with resolved dependencies
         if self.original_init is not object.__init__:
             resolved_deps = {}
-            # need to resolve because `__new__` and `__init__` may have different dependencies
             for param_name, dep_type in self.dependencies.items():
                 if self.scope is Scopes.SINGLETON and self._dep_is_not_singleton_scope(
                     dep_type
@@ -176,9 +169,7 @@ def injectable(
             def __init__(self, db: DatabaseService):
                 self.db = db
     """
-    # Handle both @injectable and @injectable()
     if _cls is None:
-        # Called with arguments: @injectable(scope=True)
         return lambda cls: injectable(cls, scope=scope)
 
     if hasattr(_cls, "__init__"):
@@ -192,11 +183,9 @@ def injectable(
             if param_name in type_hints:
                 dependencies[param_name] = type_hints[param_name]
 
-        # Capture original __init__ and __new__ before any modifications
         original_init = _cls.__init__
         original_new = _cls.__new__ if hasattr(_cls, "__new__") else object.__new__
 
-        # Create and attach metadata
         metadata = _InjectableMetadata(
             cls=_cls,
             scope=scope,
@@ -205,7 +194,6 @@ def injectable(
             original_new=original_new,
         )
 
-        # Attach metadata to class (this is the only modification)
         _cls.__injectable_metadata__ = metadata
 
     return _cls

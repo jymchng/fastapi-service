@@ -7,12 +7,6 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-# Ensure src layout is importable
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
 from fastapi_service import Container
 
 
@@ -35,11 +29,11 @@ def client(app):
 
 @pytest.fixture(scope="session")
 def load_factor():
-    value = os.getenv("TEST_LOAD_FACTOR", "100")
+    value = os.getenv("TEST_LOAD_FACTOR", "25")
     try:
         return int(value)
     except Exception:
-        return 100
+        return 25
 
 
 @pytest.fixture

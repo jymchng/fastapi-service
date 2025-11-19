@@ -882,7 +882,7 @@ def release_info(session: Session):
             silent=True,
             success_codes=[0, 128],
         ).strip()
-    except:
+    except Exception:
         current_branch = "unknown"
         last_tag = "none"
         commits_since_tag = "unknown"

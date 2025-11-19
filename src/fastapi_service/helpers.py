@@ -1,7 +1,7 @@
 import json
 import re
 from contextlib import AsyncExitStack
-from typing import Any, Callable, Optional, Type
+from typing import Any, Callable, Optional, Type, TYPE_CHECKING
 import email.message
 from typing_extensions import TypeIs
 
@@ -19,6 +19,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.routing import compile_path, get_name
 from fastapi_service.protocols import InjectableProtocol
 from fastapi_service.typing import _T
+
+if TYPE_CHECKING:
+    pass
 
 
 def generate_unique_id_for_dependant(dependant: Dependant, path_format: str):
