@@ -12,3 +12,6 @@ wheels/
 # UV
 uv.lock
 .python-version
+
+# Pytest
+.coverage
