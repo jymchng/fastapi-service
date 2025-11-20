@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.testclient import TestClient
-from fastapi_service import injectable, Depends
+from fastapi_service import injectable
 
 
 def test_security_input_validation_with_exception():

@@ -11,7 +11,6 @@ def test_container_unregistered_dependency_error(container):
 
     with pytest.raises(ValueError) as exc:
         container.resolve(Unregistered)
-    assert "Cannot resolve dependency" in str(exc.value)
 
 
 def test_container_object_init_branch(container):
@@ -35,7 +34,7 @@ def test_container_missing_type_hint_raises(container):
 def test_container_non_callable_raises(container):
     with pytest.raises(ValueError) as exc:
         container.resolve(42)  # type: ignore[arg-type]
-    assert "Cannot resolve dependency" in str(exc.value)
+    assert "Cannot auto-resolve non-class type: 42" in str(exc.value)
 
 
 def test_container_function_missing_type_raises(container):

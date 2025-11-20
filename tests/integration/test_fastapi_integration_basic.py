@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
-from fastapi_service import injectable, Depends, Scopes
+from fastapi_service import injectable, Scopes
+from fastapi import Depends
 
 
 def test_fastapi_endpoints_basic_injection(app, client):

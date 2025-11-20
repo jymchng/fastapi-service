@@ -1,9 +1,9 @@
 from enum import Enum, auto
 
 
-class Scopes(Enum):
-    SINGLETON = auto()
+class Scopes(int, Enum):
+    SINGLETON = 30
     """Live as long as the application."""
 
-    TRANSIENT = auto()
+    TRANSIENT = 40
     """Use and throw away."""

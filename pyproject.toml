@@ -21,3 +21,7 @@ test = [
     "pytest>=8.3.3",
     "pytest-cov>=5.0.0",
 ]
+examples = [
+    "fastapi>=0.121.2",
+    "typing-extensions>=4.15.0",
+]

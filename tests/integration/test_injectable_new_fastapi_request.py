@@ -1,6 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
-from fastapi_service import injectable, Depends
+from fastapi_service import injectable
 
 
 def test_injectable_with_custom_new_and_request_resolution():

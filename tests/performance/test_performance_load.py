@@ -1,8 +1,8 @@
 import time
 import statistics
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
-from fastapi_service import injectable, Depends, Scopes
+from fastapi_service import injectable, Scopes
 
 
 def test_performance_response_times_under_load(load_factor):

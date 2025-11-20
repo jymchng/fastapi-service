@@ -15,3 +15,6 @@ uv.lock
 
 # Pytest
 .coverage
+
+# Project-Specific
+examples/scratchpad.py
