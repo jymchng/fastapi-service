@@ -1,6 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
 from fastapi_service import injectable, Scopes
-from fastapi import Depends
+from fastapi import Depends, Request
 
 
 def test_fastapi_endpoints_basic_injection(app, client):
@@ -10,7 +11,7 @@ def test_fastapi_endpoints_basic_injection(app, client):
             return f"Hello, {name}"
 
     @app.get("/greet/{name}")
-    def greet(name: str, svc: GreetingService = Depends(GreetingService)):
+    def greet(name: str, svc = Depends(GreetingService)):
         return {"message": svc.greet(name)}
 
     assert client.get("/greet/Alice").json() == {"message": "Hello, Alice"}
@@ -93,7 +94,7 @@ def test_fastapi_singleton_shared_across_routes(app, client):
     assert client.get("/c2").json() == {"count": 2}
 
 
-def test_transient_injectables_can_dependent_on_singleton_injectables(app, client):
+def test_transient_injectables_can_depend_on_singleton_injectables(app, client):
     @injectable(scope=Scopes.SINGLETON)
     class Db:
         def query(self):
@@ -112,3 +113,30 @@ def test_transient_injectables_can_dependent_on_singleton_injectables(app, clien
         return {"data": cache.get()}
 
     assert client.get("/data").json() == {"data": "cached:data"}
+    
+    
+def test_singleton_injectable_cannot_depend_on_request_scoped_injectables(app, client):
+    @injectable
+    class RequestSvc:
+        def __init__(self, req: Request):
+            self.count = 0
+            self.req = req
+
+        def inc(self):
+            self.count += 1
+            return self.count
+
+    @injectable(scope=Scopes.SINGLETON)
+    class SingletonSvc:
+        def __init__(self, req_svc: RequestSvc):
+            self.req_svc = req_svc
+
+        def get(self):
+            return self.req_svc.inc()
+        
+    @app.get("/")
+    def route(svc = Depends(SingletonSvc)):
+        return {"count": svc.get()}
+    
+    with pytest.raises(ValueError) as exc:
+        assert client.get("/").json() == {"count": 1}

@@ -118,6 +118,9 @@ class _InjectableMetadata(Generic[_T]):
             
             # using `self.dependencies` is correct because anyway it is the `__init__` parameters that has type hints
             for param_name, dep_type in self.dependencies.items():
+                if param_name in additional_context:
+                    resolved_deps[param_name] = additional_context[param_name]
+                    continue
                 additional_context = (
                     additional_context_manager.update_additional_context(
                         dep_type, additional_context
@@ -152,6 +155,9 @@ class _InjectableMetadata(Generic[_T]):
             print("self.original_init is not OBJECT_INIT_FUNC")
             resolved_deps = {}
             for param_name, dep_type in self.dependencies.items():
+                if param_name in additional_context:
+                    resolved_deps[param_name] = additional_context[param_name]
+                    continue
                 additional_context = (
                     additional_context_manager.update_additional_context(
                         dep_type, additional_context
