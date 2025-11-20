@@ -46,7 +46,7 @@ def test_fastapi_async_route_with_dependency(app):
             return "ok"
 
     @app.get("/async")
-    async def route(svc: AsyncSvc = Depends(AsyncSvc)):
+    async def route(svc = Depends(AsyncSvc)):
         return {"result": await svc.process()}
 
     assert client.get("/async").json() == {"result": "ok"}
@@ -61,7 +61,7 @@ def test_fastapi_header_auth(app, client):
             return token == "valid"
 
     @app.get("/protected")
-    def protected(authorization: str = Header(...), auth: Auth = Depends(Auth)):
+    def protected(authorization = Header(...), auth = Depends(Auth)):
         if not auth.verify(authorization):
             return {"error": "Unauthorized"}
         return {"message": "Authorized"}
@@ -82,12 +82,33 @@ def test_fastapi_singleton_shared_across_routes(app, client):
             return self.count
 
     @app.get("/c1")
-    def c1(svc: Counter = Depends(Counter)):
+    def c1(svc = Depends(Counter)):
         return {"count": svc.inc()}
 
     @app.get("/c2")
-    def c2(svc: Counter = Depends(Counter)):
+    def c2(svc = Depends(Counter)):
         return {"count": svc.inc()}
 
     assert client.get("/c1").json() == {"count": 1}
     assert client.get("/c2").json() == {"count": 2}
+
+
+def test_transient_injectables_can_dependent_on_singleton_injectables(app, client):
+    @injectable(scope=Scopes.SINGLETON)
+    class Db:
+        def query(self):
+            return "data"
+
+    @injectable(scope=Scopes.TRANSIENT)
+    class Cache:
+        def __init__(self, db: Db):
+            self.db = db
+
+        def get(self):
+            return f"cached:{self.db.query()}"
+
+    @app.get("/data")
+    def data(cache = Depends(Cache)):
+        return {"data": cache.get()}
+
+    assert client.get("/data").json() == {"data": "cached:data"}

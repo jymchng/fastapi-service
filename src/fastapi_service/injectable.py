@@ -115,7 +115,8 @@ class _InjectableMetadata(Generic[_T]):
         if self.original_new is not OBJECT_NEW_FUNC:
             print("self.original_new is not OBJECT_NEW_FUNC")
             resolved_deps = {}
-            # TODO abstract away this logic use `original_new_signature.parameters.items()` instead of `self.dependencies.items()`
+            
+            # using `self.dependencies` is correct because anyway it is the `__init__` parameters that has type hints
             for param_name, dep_type in self.dependencies.items():
                 additional_context = (
                     additional_context_manager.update_additional_context(

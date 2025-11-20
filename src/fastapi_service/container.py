@@ -117,7 +117,6 @@ class Container:
                 if param_name in additional_context:
                     # even if param.default is not empty, value in additional_context takes priority
                     # because it is oracle
-                    all_deps_are_singleton = False
                     resolved_deps[param_name] = additional_context[param_name]
                     continue
 
