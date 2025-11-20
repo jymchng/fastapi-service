@@ -17,6 +17,7 @@ from fastapi_service.enums import Scopes
 from fastapi_service.helpers import (
     _get_injectable_metadata,
     _is_injectable_instance,
+    _get_dependencies_from_signature,
 )
 from fastapi_service.protocols import (
     ContainerProtocol,
@@ -103,28 +104,16 @@ class _InjectableMetadata(Generic[_T]):
     def _create_instance(
         self, container: "ContainerProtocol", additional_context: Dict[str, Any] = {}
     ) -> Any:
-        resolved_deps = {}
+        print("`_created_instance`'s `self` = ", self)
+        print(
+            "`additional_context` = ",
+            additional_context,
+            " dependencies: ",
+            self.dependencies,
+        )
         additional_context_manager = AdditionalContextManager(additional_context)
         if self.original_new is not OBJECT_NEW_FUNC:
-            for param_name, dep_type in self.dependencies.items():
-                additional_context = (
-                    additional_context_manager.update_additional_context(
-                        dep_type, additional_context
-                    )
-                )
-                resolved_deps[param_name] = container.resolve(
-                    dep_type, additional_context
-                )
-                # resolve first then check scopes
-                self._check_self_scope_dep_scope_are_valid(dep_type, container)
-            instance = self.original_new(self.cls, **(resolved_deps))
-        else:
-            instance = self.original_new(self.cls)
-
-        if not isinstance(instance, self.cls):
-            return instance
-
-        if self.original_init is not OBJECT_INIT_FUNC:
+            print("self.original_new is not OBJECT_NEW_FUNC")
             resolved_deps = {}
             for param_name, dep_type in self.dependencies.items():
                 additional_context = (
@@ -132,13 +121,55 @@ class _InjectableMetadata(Generic[_T]):
                         dep_type, additional_context
                     )
                 )
+                print(
+                    "`additional_context` = ",
+                    additional_context,
+                    " dependencies: ",
+                    self.dependencies,
+                )
                 resolved_deps[param_name] = container.resolve(
                     dep_type, additional_context
                 )
                 # resolve first then check scopes
                 self._check_self_scope_dep_scope_are_valid(dep_type, container)
+            print("`resolved_deps` = ", resolved_deps)
+            instance = self.original_new(self.cls, **(resolved_deps))
+        else:
+            instance = self.original_new(self.cls)
+
+        if not isinstance(instance, self.cls):
+            print(
+                "if not isinstance(instance, self.cls): ",
+                instance,
+                self.cls,
+                isinstance(instance, self.cls),
+            )
+            return instance
+
+        if self.original_init is not OBJECT_INIT_FUNC:
+            print("self.original_init is not OBJECT_INIT_FUNC")
+            resolved_deps = {}
+            for param_name, dep_type in self.dependencies.items():
+                additional_context = (
+                    additional_context_manager.update_additional_context(
+                        dep_type, additional_context
+                    )
+                )
+                print(
+                    "`additional_context` = ",
+                    additional_context,
+                    " dependencies: ",
+                    self.dependencies,
+                )
+                resolved_deps[param_name] = container.resolve(
+                    dep_type, additional_context
+                )
+                # resolve first then check scopes
+                self._check_self_scope_dep_scope_are_valid(dep_type, container)
+            print("`resolved_deps` = ", resolved_deps)
             self.original_init(instance, **resolved_deps)
         else:
+            print("self.original_init is OBJECT_INIT_FUNC")
             self.original_init(instance)
 
         return instance
@@ -172,14 +203,12 @@ def injectable(
         init_signature = inspect.signature(_cls.__init__)
         type_hints = get_type_hints(_cls.__init__)
 
-        dependencies = {}
-        init_signature_params_without_first_param = list(
-            init_signature.parameters.items()
-        )[1:]
-        for param_name, _ in init_signature_params_without_first_param:
-            if param_name in type_hints:
-                dependencies[param_name] = type_hints[param_name]
+        init_signature = init_signature.replace(
+            parameters=list(init_signature.parameters.values())[1:]
+        )
+        dependencies = _get_dependencies_from_signature(init_signature, type_hints)
 
+        print("`dependencies`: ", dependencies)
         original_init = _cls.__init__
         original_new = (
             _cls.__new__ if hasattr(_cls, DUNDER_NEW_KEY) else OBJECT_NEW_FUNC

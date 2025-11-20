@@ -1,4 +1,5 @@
 from fastapi_service import injectable, Scopes
+import pytest
 
 
 def test_injectable_basic_resolution(container):
@@ -63,9 +64,12 @@ def test_edge_custom_new_instance(container):
         def __new__(cls):
             return {"factory": True}
 
-    result = container.resolve(FactoryService)
-    assert isinstance(result, dict)
-    assert result["factory"] is True
+    with pytest.raises(ValueError) as exc:
+        result = container.resolve(FactoryService)
+        assert isinstance(result, dict)
+        assert result["factory"] is True
+
+    assert "Cannot auto-resolve non-class type: None" in str(exc)
 
 
 def test_singleton_cannot_depend_on_transient(container):

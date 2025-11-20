@@ -1,8 +1,9 @@
 import json
 import re
 from contextlib import AsyncExitStack
-from typing import Any, Callable, Optional, Type, TYPE_CHECKING
+from typing import Any, Callable, Optional, Type, Dict
 import email.message
+import inspect
 from typing_extensions import TypeIs
 
 from fastapi import HTTPException, Request, params
@@ -20,8 +21,18 @@ from fastapi.routing import compile_path, get_name
 from fastapi_service.protocols import InjectableProtocol
 from fastapi_service.typing import _T
 
-if TYPE_CHECKING:
-    pass
+
+def _get_dependencies_from_signature(
+    signature_: inspect.Signature, type_hints: dict[str, Any]
+) -> Dict[str, Optional[Any]]:
+    from fastapi_service.injectable import _InjectableMetadata
+
+    return {
+        name: type_hints.get(name)
+        for name, param in list(signature_.parameters.items())
+        # if param.default is inspect.Parameter.empty
+        # or isinstance(param.default, (params.Depends, _InjectableMetadata, params.FieldInfo, params.Param))
+    }
 
 
 def generate_unique_id_for_dependant(dependant: Dependant, path_format: str):

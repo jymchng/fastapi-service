@@ -1,3 +1,5 @@
+import pytest
+
 from fastapi import FastAPI, Request, Depends, Path
 from fastapi.testclient import TestClient
 from fastapi_service import Scopes, Container, injectable
@@ -752,11 +754,8 @@ def test_singleton_injectable_cannot_depend_on_transient_injectable():
         def __init__(self, transient: TransientService = Depends(TransientService)):
             self.transient = transient
 
-    try:
+    with pytest.raises(ValueError):
         container.resolve(SingletonService)
-        assert False, "Should have raised ValueError for invalid dependency"
-    except ValueError:
-        print("✓ Singleton injectable cannot depend on transient injectable")
 
     app = FastAPI()
 
@@ -765,7 +764,5 @@ def test_singleton_injectable_cannot_depend_on_transient_injectable():
         return {"transient_id": svc.transient.id}
 
     testclient = TestClient(app)
-    try:
+    with pytest.raises(ValueError):
         testclient.get("/test")  # This should also raise the error
-    except Exception:
-        print("✓ FastAPI route with singleton depending on transient raised error")

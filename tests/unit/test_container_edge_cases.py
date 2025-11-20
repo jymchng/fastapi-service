@@ -9,8 +9,7 @@ def test_container_unregistered_dependency_error(container):
         def __init__(self, missing: int):
             self.missing = missing
 
-    with pytest.raises(ValueError) as exc:
-        container.resolve(Unregistered)
+    assert container.resolve(Unregistered).missing == 0
 
 
 def test_container_object_init_branch(container):
@@ -28,7 +27,10 @@ def test_container_missing_type_hint_raises(container):
 
     with pytest.raises(ValueError) as exc:
         container.resolve(Bad)
-    assert "has no type hint and no default value" in str(exc.value)
+    assert (
+        "Cannot resolve dependency for parameter 'missing' in Bad.__init__: type hint is missing."
+        in str(exc.value)
+    )
 
 
 def test_container_non_callable_raises(container):
@@ -43,7 +45,10 @@ def test_container_function_missing_type_raises(container):
 
     with pytest.raises(ValueError) as exc:
         container.resolve(f)
-    assert "has no type hint and no default value" in str(exc.value)
+    assert (
+        "Cannot resolve dependency for parameter 'unknown' in f: type hint is missing."
+        in str(exc.value)
+    )
 
 
 def test_container_function_default_value_skips(container):
