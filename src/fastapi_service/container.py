@@ -160,14 +160,6 @@ class Container:
                 original_init=dependency.__init__,
                 original_new=getattr(dependency, "__new__", object.__new__),
             )
-            print(
-                "`dependency`: ",
-                dependency,
-                " `dependencies`: ",
-                dependencies,
-                " `resolved_deps`: ",
-                resolved_deps,
-            )
             self._registry[dependency] = metadata
             return dependency(**resolved_deps)
 
@@ -179,28 +171,50 @@ class Container:
 
         dependencies = _get_dependencies_from_signature(call_signature, type_hints)
         resolved_deps = {}
-        all_deps_are_singleton = True
-        for param_name, param in dependencies.items():
-            if param is None:
+        metadata_scope = Scopes.SINGLETON
+        for param_name, param in call_signature.parameters.items():
+            # found in oracle, good
+            if param_name in additional_context:
+                # even if param.default is not empty, value in additional_context takes priority
+                # because it is oracle
+                resolved_deps[param_name] = additional_context[param_name]
+                continue
+
+            # has default value, good, but cannot be like `Depends` etc
+            if param.default is not inspect.Parameter.empty:
+                resolved_deps[param_name] = param.default
+                continue
+
+            if param is None or param_name not in type_hints:
                 raise ValueError(
                     f"Cannot resolve dependency for parameter '{param_name}' "
                     f"in {dependency.__name__}: type hint is missing."
                 )
+
             if param_name in type_hints:
                 dep_type = type_hints[param_name]
-                resolved_deps[param_name] = self.resolve(dep_type)
-            elif param_name in additional_context:
-                all_deps_are_singleton = False
-                resolved_deps[param_name] = additional_context[param_name]
-            elif param.default is not inspect.Parameter.empty:
-                continue
+                try:
+                    resolved_deps[param_name] = self.resolve(
+                        dep_type, additional_context
+                    )
+                    param_metadata = self._registry.get(dep_type)
+                    if param_metadata is not None:
+                        metadata_scope = max(metadata_scope, param_metadata.scope)
+                except ValueError as e:
+                    raise ValueError(
+                        f"Cannot resolve dependency for parameter '{param_name}' "
+                        f"in {dependency.__name__}.__init__."
+                    ) from e
             else:
                 raise ValueError(
-                    f"Parameter '{param_name}' in {dependency} has no type hint and no default value"
+                    f"Parameter '{param_name}' in {dependency.__name__}.__init__ "
+                    f"has no type hint and no default value. "
+                    f"The parameter is: {param}. "
+                    f"Type hints: {type_hints}."
                 )
         metadata = _InjectableMetadata(
             cls=dependency,
-            scope=Scopes.SINGLETON if all_deps_are_singleton else Scopes.TRANSIENT,
+            scope=metadata_scope,
             dependencies=dependencies,
             original_init=None,
             original_new=dependency,
