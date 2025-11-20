@@ -32,6 +32,13 @@ from fastapi_service.container import (
 from fastapi_service.additional_context_manager import (
     AdditionalContextManager,
 )
+from fastapi_service.constants import (
+    DUNDER_INIT_KEY,
+    DUNDER_NEW_KEY,
+    OBJECT_INIT_FUNC,
+    OBJECT_NEW_FUNC,
+    FASTAPI_REQUEST_KEY,
+)
 from fastapi import Request
 
 
@@ -98,7 +105,7 @@ class _InjectableMetadata(Generic[_T]):
     ) -> Any:
         resolved_deps = {}
         additional_context_manager = AdditionalContextManager(additional_context)
-        if self.original_new is not object.__new__:
+        if self.original_new is not OBJECT_NEW_FUNC:
             for param_name, dep_type in self.dependencies.items():
                 additional_context = (
                     additional_context_manager.update_additional_context(
@@ -117,7 +124,7 @@ class _InjectableMetadata(Generic[_T]):
         if not isinstance(instance, self.cls):
             return instance
 
-        if self.original_init is not object.__init__:
+        if self.original_init is not OBJECT_INIT_FUNC:
             resolved_deps = {}
             for param_name, dep_type in self.dependencies.items():
                 additional_context = (
@@ -161,38 +168,41 @@ def injectable(
     if _cls is None:
         return lambda cls: injectable(cls, scope=scope)
 
-    if hasattr(_cls, "__init__"):
+    if hasattr(_cls, DUNDER_INIT_KEY):
         init_signature = inspect.signature(_cls.__init__)
         type_hints = get_type_hints(_cls.__init__)
 
         dependencies = {}
-        for param_name, _ in init_signature.parameters.items():
-            if param_name == "self":
-                continue
+        init_signature_params_without_first_param = list(
+            init_signature.parameters.items()
+        )[1:]
+        for param_name, _ in init_signature_params_without_first_param:
             if param_name in type_hints:
                 dependencies[param_name] = type_hints[param_name]
 
         original_init = _cls.__init__
-        original_new = _cls.__new__ if hasattr(_cls, "__new__") else object.__new__
+        original_new = (
+            _cls.__new__ if hasattr(_cls, DUNDER_NEW_KEY) else OBJECT_NEW_FUNC
+        )
 
         @staticmethod
         @wraps(original_new)
         def factory_new(cls_or_subcls, *args, **kwargs):
             if cls_or_subcls is not _cls:
-                if original_new is not object.__new__:
-                    kwargs.pop("__fastapi_request__", None)
+                if original_new is not OBJECT_NEW_FUNC:
+                    kwargs.pop(FASTAPI_REQUEST_KEY, None)
                     return original_new(cls_or_subcls, *args, **kwargs)
-                return object.__new__(cls_or_subcls)
+                return OBJECT_NEW_FUNC(cls_or_subcls)
             container = Container()
             return container.resolve(_cls, kwargs)
 
         @wraps(original_init)
         def factory_init(instance, *args, **kwargs):
             if type(instance) is not _cls:
-                if original_new is not object.__init__:
-                    kwargs.pop("__fastapi_request__", None)
+                if original_new is not OBJECT_INIT_FUNC:
+                    kwargs.pop(FASTAPI_REQUEST_KEY, None)
                     return original_init(instance, *args, **kwargs)
-                return object.__init__(instance)
+                return OBJECT_INIT_FUNC(instance)
 
         _cls.__init__ = factory_init
         _cls.__new__ = factory_new
@@ -204,7 +214,7 @@ def injectable(
                     annotation=_cls,
                 ),
                 inspect.Parameter(
-                    "__fastapi_request__",
+                    FASTAPI_REQUEST_KEY,
                     inspect.Parameter.KEYWORD_ONLY,
                     default=inspect.Parameter.empty,
                     annotation=Request,
