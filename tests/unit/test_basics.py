@@ -769,7 +769,7 @@ def test_singleton_injectable_cannot_depend_on_transient_injectable():
 
 
 def test_can_still_instantiate_regularly():
-    @injectable
+    
     class TransientService:
         def __init__(self, num: int = 69):
             self.id = id(self)
@@ -777,7 +777,7 @@ def test_can_still_instantiate_regularly():
 
     @injectable
     class TransientServiceTwo:
-        def __init__(self, transient: TransientService = Depends(TransientService)):
+        def __init__(self, transient: TransientService):
             self.transient = transient
 
     app = FastAPI()
@@ -790,12 +790,30 @@ def test_can_still_instantiate_regularly():
     assert testclient.get("/test").json() == {"num": 69}
 
     transient_svc = TransientService(70)
-    print(transient_svc)
-    print(transient_svc.id)
-    print(transient_svc.num)
     transient_svc_two = TransientServiceTwo(transient_svc)
-    print(transient_svc_two)
-    print(transient_svc_two.transient.id)
-    print(transient_svc_two.transient.num)
 
     assert transient_svc_two.transient.num == 70
+    
+    class ChildTransientService(TransientService):
+        
+        def __init__(self, num: int = 71, num1: int = 72):
+            super().__init__(num)
+            self.num1 = num1
+            
+    child_transient_svc = ChildTransientService(54, 55)
+    assert child_transient_svc.num == 54
+    assert child_transient_svc.num1 == 55
+    
+    @app.get("/test/{name}")
+    def test_route(name: str, svc: ChildTransientService=Depends(ChildTransientService)):
+        return {
+            "name": name,
+            "num": svc.num,
+            "num1": svc.num1,
+        }
+        
+    assert testclient.get("/test/James").json() == {
+        "name": "James",
+        "num": 71,
+        "num1": 72,
+    }
