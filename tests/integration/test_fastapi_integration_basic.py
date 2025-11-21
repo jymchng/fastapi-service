@@ -139,10 +139,11 @@ def test_singleton_injectable_cannot_depend_on_request_scoped_injectables(app, c
 
     def depends_on_path(name: str = Path()):
         assert name == test_name
+        return name
 
     @injectable
     class RequestSvc:
-        def __init__(self, req: Request, name = Depends(depends_on_path)):
+        def __init__(self, req: Request, name=Depends(depends_on_path)):
             self.count = 0
             self.req = req
             self.name = name
@@ -164,5 +165,11 @@ def test_singleton_injectable_cannot_depend_on_request_scoped_injectables(app, c
     def route(svc=Depends(SingletonSvc)):
         return {"count": svc.get()}
 
-    assert client.get("/" + test_name).json() == {"count": 1}
-    assert client.get("/" + test_name).json() == {"count": 2}
+    with pytest.raises(ValueError) as exc_info:
+        assert client.get("/" + test_name).json() == {"count": 1}
+        assert client.get("/" + test_name).json() == {"count": 2}
+
+    assert (
+        "Cannot inject non-singleton-scoped dependency 'RequestSvc' into singleton-scoped 'SingletonSvc'"
+        in str(exc_info)
+    )

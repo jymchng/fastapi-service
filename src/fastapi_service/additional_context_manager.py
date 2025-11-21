@@ -13,33 +13,22 @@ class AdditionalContextManager:
     __fastapi_request__: Optional[Request] = None
 
     def __init__(self, kwargs: Dict[str, Any]):
-        self.__fastapi_request__ = kwargs.pop(FASTAPI_REQUEST_KEY, None)
+        self.__fastapi_request__ = kwargs.get(FASTAPI_REQUEST_KEY)
+        self.dependency_cache = dict()
 
     def update_additional_context(
         self, dependency: Type[_T], additional_context: Dict[str, Any]
     ) -> Dict[str, Any]:
-        import inspect
-
-        original_additional_context = additional_context
+        original_additional_context = {k: v for k, v in additional_context.items()}
         if self.__fastapi_request__ is not None:
             try:
                 additional_context = asyncio.run(
-                    get_solved_dependencies(self.__fastapi_request__, dependency, {})
+                    get_solved_dependencies(
+                        self.__fastapi_request__, dependency, self.dependency_cache
+                    )
                 ).values
                 additional_context[FASTAPI_REQUEST_KEY] = self.__fastapi_request__
-                print(
-                    f"28: Dependencies solved by FastAPI: `additional_context`: {additional_context}; `dependency`: {dependency}, "
-                    f"signature: {inspect.signature(dependency)}"
-                )
-            except Exception as err:
-                print(
-                    "Exception occurred: ",
-                    err,
-                    " dependency: ",
-                    dependency,
-                    " signature: ",
-                    inspect.signature(dependency),
-                )
+            except Exception:
                 original_additional_context[FASTAPI_REQUEST_KEY] = (
                     self.__fastapi_request__
                 )

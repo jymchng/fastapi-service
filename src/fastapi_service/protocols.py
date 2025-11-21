@@ -28,5 +28,8 @@ class MetadataProtocol(Protocol[_T]):
     """Protocol for dependency injection container."""
 
     def get_instance(
-        self, container: ContainerProtocol, additional_context: Dict[str, Any]
+        self,
+        dependency: Any,
+        container: ContainerProtocol,
+        additional_context: Dict[str, Any],
     ) -> _T: ...

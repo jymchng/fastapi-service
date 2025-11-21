@@ -60,20 +60,23 @@ class Container:
             if isinstance(dependency, str):
                 if dependency in self._token_metadata_registry:
                     metadata = self._token_metadata_registry[dependency]
-                    return metadata.get_instance(self, additional_context)
+                    return metadata.get_instance(dependency, self, additional_context)
 
             if isinstance(dependency, MetadataProtocol):
-                return dependency.get_instance(self, additional_context)
+                return dependency.get_instance(dependency, self, additional_context)
 
             if dependency in self._registry:
                 metadata = self._registry[dependency]
-                return metadata.get_instance(self, additional_context)
+                return metadata.get_instance(dependency, self, additional_context)
 
             if _is_injectable_instance(dependency):
                 metadata = dependency.__injectable_metadata__
                 if metadata.cls is dependency:
                     self._registry[metadata.cls] = metadata
-                    return metadata.get_instance(self, additional_context)
+                    print(
+                        f"`dependency` = {dependency}; additional_context = {additional_context}"
+                    )
+                    return metadata.get_instance(dependency, self, additional_context)
 
             return self._auto_resolve(dependency, additional_context)
 
@@ -91,7 +94,9 @@ class Container:
         if dependency.__init__ is object.__init__:
             metadata = _InjectableMetadata(
                 cls=dependency,
-                scope=Scopes.SINGLETON,
+                # auto_resolved dependency, i.e. not decorated with `@singleton(scope=Scopes.SINGLETON)`
+                # are always transient
+                scope=Scopes.TRANSIENT,
                 dependencies={},
                 original_init=object.__init__,
                 original_new=getattr(dependency, "__new__", object.__new__),
@@ -100,6 +105,7 @@ class Container:
 
             return dependency()
 
+        # dependency.__init__ is NOT object.__init__
         init_signature = inspect.signature(dependency.__init__)
         type_hints = get_type_hints(dependency.__init__)
 
@@ -108,7 +114,7 @@ class Container:
         )
         dependencies = _get_dependencies_from_signature(init_signature, type_hints)
         resolved_deps = {}
-        metadata_scope = Scopes.SINGLETON
+        # metadata_scope = Scopes.SINGLETON
         for param_name, param in init_signature.parameters.items():
             # found in oracle, good
             if param_name in additional_context:
@@ -134,9 +140,9 @@ class Container:
                     resolved_deps[param_name] = self.resolve(
                         dep_type, additional_context
                     )
-                    param_metadata = self._registry.get(dep_type)
-                    if param_metadata is not None:
-                        metadata_scope = max(metadata_scope, param_metadata.scope)
+                    # param_metadata = self._registry.get(dep_type)
+                    # if param_metadata is not None:
+                    #     metadata_scope = max(metadata_scope, param_metadata.scope)
                 except ValueError as e:
                     raise ValueError(
                         f"Cannot resolve dependency for parameter '{param_name}' "
@@ -151,12 +157,15 @@ class Container:
                 )
         metadata = _InjectableMetadata(
             cls=dependency,
-            scope=metadata_scope,
+            # auto_resolved dependency, i.e. not decorated with `@singleton(scope=Scopes.SINGLETON)`
+            # are always transient
+            scope=Scopes.TRANSIENT,
             dependencies=dependencies,
             original_init=dependency.__init__,
             original_new=getattr(dependency, "__new__", object.__new__),
         )
         self._registry[dependency] = metadata
+        print(f"`dependency` = {dependency}; `metadata` =")
         return dependency(**resolved_deps)
 
     def _auto_resolve(

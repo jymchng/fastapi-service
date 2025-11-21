@@ -22,6 +22,15 @@ from fastapi_service.protocols import InjectableProtocol
 from fastapi_service.typing import _T
 
 
+def _make_fake_function_with_same_signature(
+    signature: inspect.Signature,
+):
+    def fake_function(): ...
+
+    fake_function.__signature__ = signature
+    return fake_function
+
+
 def _remove_first_param_from_init_or_new_func_signature(
     new_or_init_func: Callable,
 ):
