@@ -101,10 +101,40 @@ class _InjectableMetadata(Generic[_T]):
                 self._instance = self._create_instance(container, additional_context)
             return self._instance
         return self._create_instance(container, additional_context)
-
+    
+    def _get_resolved_dependencies(
+        self, container: "ContainerProtocol", additional_context: Dict[str, Any] = None,
+    ):
+        additional_context = additional_context or {}
+        additional_context_manager = AdditionalContextManager(additional_context)
+        resolved_deps = {}
+        # using `self.dependencies` is correct because anyway it is the `__init__` parameters that has type hints
+        for param_name, dep_type in self.dependencies.items():
+            if param_name in additional_context:
+                resolved_deps[param_name] = additional_context[param_name]
+                continue
+            additional_context = (
+                additional_context_manager.update_additional_context(
+                    dep_type, additional_context
+                )
+            )
+            print(
+                "`additional_context` = ",
+                additional_context,
+                " dependencies: ",
+                self.dependencies,
+            )
+            resolved_deps[param_name] = container.resolve(
+                dep_type, additional_context
+            )
+            # resolve first then check scopes
+            self._check_self_scope_dep_scope_are_valid(dep_type, container)
+        print("`resolved_deps` = ", resolved_deps)
+        return resolved_deps
     def _create_instance(
-        self, container: "ContainerProtocol", additional_context: Dict[str, Any] = {}
+        self, container: "ContainerProtocol", additional_context: Dict[str, Any] = None
     ) -> Any:
+        additional_context = additional_context or {}
         print("`_created_instance`'s `self` = ", self)
         print(
             "`additional_context` = ",
@@ -112,36 +142,12 @@ class _InjectableMetadata(Generic[_T]):
             " dependencies: ",
             self.dependencies,
         )
-        additional_context_manager = AdditionalContextManager(additional_context)
         if self.original_new is not OBJECT_NEW_FUNC:
             print("self.original_new is not OBJECT_NEW_FUNC")
-            additional_context_manager.update_additional_context(
-                self.original_new, additional_context
+            instance = self.original_new(
+                self.cls, **(self._get_resolved_dependencies(container, additional_context))
             )
-            resolved_deps = {}
-            # using `self.dependencies` is correct because anyway it is the `__init__` parameters that has type hints
-            for param_name, dep_type in self.dependencies.items():
-                if param_name in additional_context:
-                    resolved_deps[param_name] = additional_context[param_name]
-                    continue
-                additional_context = (
-                    additional_context_manager.update_additional_context(
-                        dep_type, additional_context
-                    )
-                )
-                print(
-                    "`additional_context` = ",
-                    additional_context,
-                    " dependencies: ",
-                    self.dependencies,
-                )
-                resolved_deps[param_name] = container.resolve(
-                    dep_type, additional_context
-                )
-                # resolve first then check scopes
-                self._check_self_scope_dep_scope_are_valid(dep_type, container)
-            print("`resolved_deps` = ", resolved_deps)
-            instance = self.original_new(self.cls, **(resolved_deps))
+            
         else:
             instance = self.original_new(self.cls)
 
@@ -155,9 +161,6 @@ class _InjectableMetadata(Generic[_T]):
             return instance
 
         if self.original_init is not OBJECT_INIT_FUNC:
-            additional_context_manager.update_additional_context(
-                (self.original_init), additional_context
-            )
             original_init_signature = inspect.signature(self.original_init)
             print(
                 "self.original_init is not OBJECT_INIT_FUNC! ",
@@ -169,28 +172,7 @@ class _InjectableMetadata(Generic[_T]):
                 " original_init_signature: ",
                 original_init_signature,
             )
-            resolved_deps = {}
-            for param_name, dep_type in self.dependencies.items():
-                print(f"171: `param_name` = {param_name}; `dep_type`: {dep_type}")
-                if param_name in additional_context:
-                    resolved_deps[param_name] = additional_context[param_name]
-                    continue
-                additional_context = (
-                    additional_context_manager.update_additional_context(
-                        dep_type, additional_context
-                    )
-                )
-                print(
-                    "`additional_context` = ",
-                    additional_context,
-                    " dependencies: ",
-                    self.dependencies,
-                )
-                resolved_deps[param_name] = container.resolve(
-                    dep_type, additional_context
-                )
-                # resolve first then check scopes
-                self._check_self_scope_dep_scope_are_valid(dep_type, container)
+            resolved_deps = self._get_resolved_dependencies(container, additional_context)
             print("`resolved_deps` = ", resolved_deps)
             self.original_init(instance, **resolved_deps)
         else:
