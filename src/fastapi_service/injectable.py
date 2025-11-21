@@ -232,6 +232,13 @@ def injectable(
         @staticmethod
         @wraps(original_new)
         def factory_new(cls_or_subcls, *args, **kwargs):
+            if FASTAPI_REQUEST_KEY not in kwargs:
+                # means we are instantiating it as a normal ass
+                if original_new is not OBJECT_NEW_FUNC:
+                    return original_new(cls_or_subcls, *args, **kwargs)
+                return OBJECT_NEW_FUNC(cls_or_subcls)
+            # here we are not instantiating it as a normal class
+            # `Depends` is instantiating it
             if cls_or_subcls is not _cls:
                 # means `cls_or_subcls` is subcls of `_cls`
                 subcls = cls_or_subcls
@@ -241,11 +248,17 @@ def injectable(
                     kwargs.pop(FASTAPI_REQUEST_KEY, None)
                     return original_new(subcls, *args, **kwargs)
                 return OBJECT_NEW_FUNC(subcls)
+            # the actual `_cls`
             container = Container()
             return container.resolve(_cls, kwargs)
 
         @wraps(original_init)
         def factory_init(instance, *args, **kwargs):
+            if FASTAPI_REQUEST_KEY not in kwargs:
+                # means we are instantiating it as a normal ass
+                if original_new is not OBJECT_INIT_FUNC:
+                    return original_init(instance, *args, **kwargs)
+                return OBJECT_INIT_FUNC(instance)
             if type(instance) is not _cls:
                 if original_new is not OBJECT_INIT_FUNC:
                     kwargs.pop(FASTAPI_REQUEST_KEY, None)

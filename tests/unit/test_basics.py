@@ -766,3 +766,37 @@ def test_singleton_injectable_cannot_depend_on_transient_injectable():
     testclient = TestClient(app)
     with pytest.raises(ValueError):
         testclient.get("/test")  # This should also raise the error
+
+
+def test_can_still_instantiate_regularly():
+    @injectable
+    class TransientService:
+        def __init__(self, num: int=69):
+            self.id = id(self)
+            self.num = num
+
+    @injectable
+    class TransientServiceTwo:
+        def __init__(self, transient: TransientService = Depends(TransientService)):
+            self.transient = transient
+
+    app = FastAPI()
+
+    @app.get("/test")
+    def test_route(svc = Depends(TransientServiceTwo)):
+        return {"num": svc.transient.num}
+
+    testclient = TestClient(app)
+    assert testclient.get("/test").json() == {"num": 69}
+    
+    transient_svc = TransientService(70)
+    print(transient_svc)
+    print(transient_svc.id)
+    print(transient_svc.num)
+    transient_svc_two = TransientServiceTwo(transient_svc)
+    print(transient_svc_two)
+    print(transient_svc_two.transient.id)
+    print(transient_svc_two.transient.num)
+    
+    
+    assert transient_svc_two.transient.num == 70
