@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from fastapi_service import injectable, Scopes
-from fastapi import Depends, Request
+from fastapi import Depends, Request, Path
 
 
 def test_fastapi_endpoints_basic_injection(app, client):
@@ -115,12 +115,38 @@ def test_transient_injectables_can_depend_on_singleton_injectables(app, client):
     assert client.get("/data").json() == {"data": "cached:data"}
 
 
+def test_fastapi_cannot_resolve_any_random_depends(app, client):
+    test_name: str = "James"
+
+    def depends_on_path_two(name: str):
+        assert name == test_name
+        return name
+
+    def depends_on_path(name=Depends(depends_on_path_two)):
+        assert name == test_name
+        return name
+
+    @app.get("/{name}")
+    def route(name: str = Depends(depends_on_path)):
+        return {"name": name}
+
+    assert client.get("/" + test_name).json() == {"name": test_name}
+    assert client.get("/" + test_name).json() == {"name": test_name}
+
+
 def test_singleton_injectable_cannot_depend_on_request_scoped_injectables(app, client):
+    test_name: str = "James"
+
+    def depends_on_path(name: str = Path()):
+        assert name == test_name
+
     @injectable
     class RequestSvc:
-        def __init__(self, req: Request):
+        def __init__(self, req: Request, name = Depends(depends_on_path)):
             self.count = 0
             self.req = req
+            self.name = name
+            assert name == test_name
 
         def inc(self):
             self.count += 1
@@ -134,9 +160,9 @@ def test_singleton_injectable_cannot_depend_on_request_scoped_injectables(app, c
         def get(self):
             return self.req_svc.inc()
 
-    @app.get("/")
+    @app.get("/{name}")
     def route(svc=Depends(SingletonSvc)):
         return {"count": svc.get()}
 
-    with pytest.raises(ValueError) as exc:
-        assert client.get("/").json() == {"count": 1}
+    assert client.get("/" + test_name).json() == {"count": 1}
+    assert client.get("/" + test_name).json() == {"count": 2}
