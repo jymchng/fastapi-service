@@ -73,9 +73,6 @@ class Container:
                 metadata = dependency.__injectable_metadata__
                 if metadata.cls is dependency:
                     self._registry[metadata.cls] = metadata
-                    print(
-                        f"`dependency` = {dependency}; additional_context = {additional_context}"
-                    )
                     return metadata.get_instance(dependency, self, additional_context)
 
             return self._auto_resolve(dependency, additional_context)
@@ -88,7 +85,6 @@ class Container:
         dependency: Type[_T],
         additional_context: Dict[str, Any] = None,
     ):
-        print("isinstance(dependency, type) is True; `dependency` = ", dependency)
         from fastapi_service.injectable import _InjectableMetadata
 
         if dependency.__init__ is object.__init__:
@@ -165,7 +161,6 @@ class Container:
             original_new=getattr(dependency, "__new__", object.__new__),
         )
         self._registry[dependency] = metadata
-        print(f"`dependency` = {dependency}; `metadata` =")
         return dependency(**resolved_deps)
 
     def _auto_resolve(

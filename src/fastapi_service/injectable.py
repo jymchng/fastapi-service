@@ -147,7 +147,6 @@ class _InjectableMetadata(Generic[_T]):
         for param_name, dep_type in self.dependencies.items():
             if param_name in additional_context:
                 resolved_deps[param_name] = additional_context[param_name]
-                # print(f"`resolved_deps` = {resolved_deps}; `param_name` = {param_name}; `additional_context` = {additional_context}")
                 if self.scope is Scopes.SINGLETON:
                     raise ValueError(
                         f"Cannot inject non-singleton-scoped dependency '{param_name}' "
@@ -181,17 +180,11 @@ class _InjectableMetadata(Generic[_T]):
         additional_context: Dict[str, Any] = None,
     ) -> _T:
         additional_context = additional_context or {}
-        print(
-            f"`_init_instance`: `instance` = {instance}, additional_context = {additional_context}"
-        )
         if self.original_init is not OBJECT_INIT_FUNC:
             resolved_deps = self._get_resolved_dependencies(
                 container, additional_context
             )
             self.original_init(instance, **resolved_deps)
-            print(
-                f"`_init_instance`: `instance` = {instance}, resolved_deps = {resolved_deps}"
-            )
         else:
             self.original_init(instance)
 
@@ -240,7 +233,7 @@ def injectable(
         @wraps(original_new)
         def factory_new(cls_or_subcls, *args, **kwargs):
             if cls_or_subcls is not _cls:
-                # means `cls_or_subcls` is subcls
+                # means `cls_or_subcls` is subcls of `_cls`
                 subcls = cls_or_subcls
                 if original_new is not OBJECT_NEW_FUNC:
                     # `Depends` can still inject the `Request` object into `**kwargs`

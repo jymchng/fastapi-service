@@ -529,5 +529,36 @@ def test_subclass_distinct_instances_ids(container):
     class Child(Base):
         pass
 
-    ids = [id(container.resolve(Child)) for _ in range(6)]
-    assert len(set(ids)) == 6
+    instances = [container.resolve(Child) for _ in range(6)]
+    assert len(set(map(lambda c: id(c), instances))) == 6
+
+
+def test_subclass_distinct_instances_ids_two(container):
+    @injectable(scope=Scopes.SINGLETON)
+    class Base:
+        def __init__(self):
+            pass
+
+    class Child(Base):
+        pass
+
+    class Grandchild(Child):
+        pass
+
+    instances = [container.resolve(Grandchild) for _ in range(6)]
+    assert len(set(map(lambda c: id(c), instances))) == 6
+
+
+def test_normal_subclass_distinct_instances_ids_two(container):
+    class Base:
+        def __init__(self):
+            pass
+
+    class Child(Base):
+        pass
+
+    class Grandchild(Child):
+        pass
+
+    instances = [container.resolve(Grandchild) for _ in range(6)]
+    assert len(set(map(lambda c: id(c), instances))) == 6
