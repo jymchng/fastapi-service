@@ -96,14 +96,12 @@ class _InjectableMetadata(Generic[_T]):
 
     def get_instance(
         self,
-        dependency: Any,
         container: "ContainerProtocol",
         additional_context: Dict[str, Any] = None,
     ) -> Any:
         additional_context = additional_context or {}
         if self.scope is Scopes.SINGLETON:
             if self._instance is None:
-                # TODO: must call `self._original_init` and set the `self.instance` to the created instance and return
                 instance = self._create_instance(container, additional_context)
                 self._init_instance(instance, container, additional_context)
                 self._instance = instance
@@ -143,7 +141,8 @@ class _InjectableMetadata(Generic[_T]):
         )
         resolved_deps = {}
 
-        # using `self.dependencies` is correct because anyway it is the `__init__` parameters that has type hints
+        # using `self.dependencies` is correct because
+        # #anyway it is the `__init__` parameters that has type hints
         for param_name, dep_type in self.dependencies.items():
             if param_name in additional_context:
                 resolved_deps[param_name] = additional_context[param_name]

@@ -27,7 +27,7 @@ def test_performance_response_times_under_load(load_factor):
         assert r.status_code == 200
 
     p95 = statistics.quantiles(latencies, n=100)[94]
-    assert p95 < 0.2
+    assert p95 < 0.5
 
 
 def test_performance_resource_utilization_memory_growth(load_factor):

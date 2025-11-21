@@ -771,7 +771,7 @@ def test_singleton_injectable_cannot_depend_on_transient_injectable():
 def test_can_still_instantiate_regularly():
     @injectable
     class TransientService:
-        def __init__(self, num: int=69):
+        def __init__(self, num: int = 69):
             self.id = id(self)
             self.num = num
 
@@ -783,12 +783,12 @@ def test_can_still_instantiate_regularly():
     app = FastAPI()
 
     @app.get("/test")
-    def test_route(svc = Depends(TransientServiceTwo)):
+    def test_route(svc=Depends(TransientServiceTwo)):
         return {"num": svc.transient.num}
 
     testclient = TestClient(app)
     assert testclient.get("/test").json() == {"num": 69}
-    
+
     transient_svc = TransientService(70)
     print(transient_svc)
     print(transient_svc.id)
@@ -797,6 +797,5 @@ def test_can_still_instantiate_regularly():
     print(transient_svc_two)
     print(transient_svc_two.transient.id)
     print(transient_svc_two.transient.num)
-    
-    
+
     assert transient_svc_two.transient.num == 70

@@ -60,20 +60,20 @@ class Container:
             if isinstance(dependency, str):
                 if dependency in self._token_metadata_registry:
                     metadata = self._token_metadata_registry[dependency]
-                    return metadata.get_instance(dependency, self, additional_context)
+                    return metadata.get_instance(self, additional_context)
 
             if isinstance(dependency, MetadataProtocol):
-                return dependency.get_instance(dependency, self, additional_context)
+                return dependency.get_instance(self, additional_context)
 
             if dependency in self._registry:
                 metadata = self._registry[dependency]
-                return metadata.get_instance(dependency, self, additional_context)
+                return metadata.get_instance(self, additional_context)
 
             if _is_injectable_instance(dependency):
                 metadata = dependency.__injectable_metadata__
                 if metadata.cls is dependency:
                     self._registry[metadata.cls] = metadata
-                    return metadata.get_instance(dependency, self, additional_context)
+                    return metadata.get_instance(self, additional_context)
 
             return self._auto_resolve(dependency, additional_context)
 

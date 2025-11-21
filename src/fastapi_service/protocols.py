@@ -29,7 +29,6 @@ class MetadataProtocol(Protocol[_T]):
 
     def get_instance(
         self,
-        dependency: Any,
         container: ContainerProtocol,
         additional_context: Dict[str, Any],
     ) -> _T: ...
