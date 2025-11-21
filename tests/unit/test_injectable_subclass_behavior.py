@@ -496,7 +496,7 @@ def test_subclass_fastapi_query_params(app):
         pass
 
     @app.get("/q")
-    def route(inst = Depends(Child), q: int = 1):
+    def route(inst=Depends(Child), q: int = 1):
         return {"id": id(inst), "q": q}
 
     client = TestClient(app)

@@ -18,6 +18,7 @@ from fastapi_service.helpers import (
     _get_injectable_metadata,
     _is_injectable_instance,
     _get_dependencies_from_signature,
+    _remove_first_n_param_from_signature,
 )
 from fastapi_service.protocols import (
     ContainerProtocol,
@@ -114,8 +115,10 @@ class _InjectableMetadata(Generic[_T]):
         additional_context_manager = AdditionalContextManager(additional_context)
         if self.original_new is not OBJECT_NEW_FUNC:
             print("self.original_new is not OBJECT_NEW_FUNC")
+            additional_context_manager.update_additional_context(
+                self.original_new, additional_context
+            )
             resolved_deps = {}
-            
             # using `self.dependencies` is correct because anyway it is the `__init__` parameters that has type hints
             for param_name, dep_type in self.dependencies.items():
                 if param_name in additional_context:
@@ -152,9 +155,23 @@ class _InjectableMetadata(Generic[_T]):
             return instance
 
         if self.original_init is not OBJECT_INIT_FUNC:
-            print("self.original_init is not OBJECT_INIT_FUNC")
+            additional_context_manager.update_additional_context(
+                (self.original_init), additional_context
+            )
+            original_init_signature = inspect.signature(self.original_init)
+            print(
+                "self.original_init is not OBJECT_INIT_FUNC! ",
+                f" `self.cls` = {self.cls} ",
+                "`additional_context` = ",
+                additional_context,
+                " dependencies: ",
+                self.dependencies,
+                " original_init_signature: ",
+                original_init_signature,
+            )
             resolved_deps = {}
             for param_name, dep_type in self.dependencies.items():
+                print(f"171: `param_name` = {param_name}; `dep_type`: {dep_type}")
                 if param_name in additional_context:
                     resolved_deps[param_name] = additional_context[param_name]
                     continue

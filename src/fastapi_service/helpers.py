@@ -22,6 +22,22 @@ from fastapi_service.protocols import InjectableProtocol
 from fastapi_service.typing import _T
 
 
+def _remove_first_param_from_init_or_new_func_signature(
+    new_or_init_func: Callable,
+):
+    return _remove_first_n_param_from_signature(
+        signature_=inspect.signature(new_or_init_func),
+        n=1,
+    )
+
+
+def _remove_first_n_param_from_signature(
+    signature_: inspect.Signature,
+    n: int = 1,
+):
+    return signature_.replace(parameters=list(signature_.parameters.values())[n:])
+
+
 def _get_dependencies_from_signature(
     signature_: inspect.Signature, type_hints: dict[str, Any]
 ) -> Dict[str, Optional[Any]]:
