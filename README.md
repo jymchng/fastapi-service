@@ -170,6 +170,97 @@ class AnalyticsService:
         print(f"Access from: {self.user_agent}")
 ```
 
+-----
+
+## 🛡️ Scopes & Scope Safety
+
+`fastapi-service` provides robust scope management to ensure your application's lifecycle is handled correctly. We support two primary scopes:
+
+  * **`Scopes.TRANSIENT` (Default):** A new instance is created for every injection. This is standard FastAPI behavior.
+  * **`Scopes.SINGLETON`:** The same instance is shared across the entire application lifetime.
+
+### Preventing "Scope Leaks"
+
+A common pitfall in dependency injection is injecting a short-lived object (Transient) into a long-lived object (Singleton). This causes the short-lived object to "live forever" inside the singleton, often leading to stale database sessions or thread-safety issues.
+
+`fastapi-service` **validates your dependency graph at runtime**. When a service is requested, the library checks the entire chain. If you attempt to inject a `TRANSIENT` service into a `SINGLETON` service, it will detect the mismatch and raise an error, preventing unstable behavior.
+
+```python
+from fastapi_service import injectable, Scopes
+
+# ❌ ERROR: You cannot inject this Transient service...
+@injectable(scope=Scopes.TRANSIENT)
+class DatabaseSession:
+    pass
+
+# ...into this Singleton service.
+@injectable(scope=Scopes.SINGLETON)
+class GlobalCache:
+    def __init__(self, session: DatabaseSession):
+        self.session = session
+```
+
+**Correct Usage:**
+Singletons should only depend on other Singletons or stateless configurations.
+
+```python
+@injectable(scope=Scopes.SINGLETON)
+class ConnectionPool:
+    pass
+
+@injectable(scope=Scopes.SINGLETON)
+class UserRepository:
+    def __init__(self, pool: ConnectionPool):
+        self.pool = pool
+```
+
+-----
+
+## 🔧 Under the Hood: Technical Architecture
+
+`fastapi-service` is designed to be a **structural analyzer** that leverages Python's native metaprogramming capabilities to prepare your classes for FastAPI's dependency resolution system.
+
+Here is the step-by-step breakdown of the injection lifecycle:
+
+### 1\. Introspection & Registration
+
+When you decorate a class with `@injectable`, the library utilizes Python's `inspect` module and `typing.get_type_hints` to analyze the `__init__` constructor. It registers the class and its type hints, preparing them for future resolution.
+
+### 2\. Dynamic Signature Rewriting (The "Magic")
+
+This is the core mechanism that enables integration with FastAPI. `fastapi-service` dynamically generates a **factory function** for each service.
+
+The library constructs a new `inspect.Signature` for this factory, programmatically inserting `fastapi.Depends(...)` into the default values of the function parameters.
+
+Essentially, it automates the translation from:
+
+```python
+# Your clean code
+class UserService:
+    def __init__(self, db: Database): ...
+```
+
+To the verbose definition FastAPI expects:
+
+```python
+# What FastAPI sees internally
+def user_service_factory(db: Database = Depends(database_factory)):
+    return UserService(db=db)
+```
+
+### 3\. Runtime Graph Resolution & Validation
+
+Currently, validation occurs dynamically at runtime during the dependency resolution phase.
+
+  * **Scope Safety:** When a dependency is instantiated, the library verifies that no `Scopes.SINGLETON` service is attempting to hold onto a `Scopes.TRANSIENT` service.
+  * **Cycle Detection:** Standard Python recursion limits and dependency resolution mechanics naturally prevent infinite loops.
+
+*Note: Future versions of `fastapi-service` aim to move these validations to build-time (startup) to catch configuration errors even earlier.*
+
+### 4\. Native Execution Strategy
+
+Because the library translates your structure into standard FastAPI dependency chains, you retain all the performance benefits of FastAPI's asynchronous execution model. The "magic" happens only during the wiring phase; the execution is pure FastAPI.
+
 ## 🤝 Contributing
 
 Contributions are welcome\! Please read our contributing guidelines to get started.
