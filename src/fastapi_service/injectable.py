@@ -99,8 +99,7 @@ class _InjectableMetadata(Generic[_T]):
                 f"Cannot inject non-singleton-scoped dependency '{dep_type.__name__}' "
                 f"into singleton-scoped '{self.cls.__name__}'"
             )
-            
-            
+
     @staticmethod
     def _from_class(
         klass: Type[_T],
@@ -136,7 +135,6 @@ class _InjectableMetadata(Generic[_T]):
             original_new_params=ctor_signature_params,
         )
         return metadata
-        
 
     def get_instance(
         self,
@@ -276,9 +274,7 @@ def injectable(
         return lambda cls: injectable(cls, scope=scope)
 
     original_init = _cls.__init__
-    original_new = (
-        _cls.__new__ if hasattr(_cls, DUNDER_NEW_KEY) else OBJECT_NEW_FUNC
-    )
+    original_new = _cls.__new__ if hasattr(_cls, DUNDER_NEW_KEY) else OBJECT_NEW_FUNC
 
     metadata = _InjectableMetadata._from_class(klass=_cls, scope=scope)
     _cls.__injectable_metadata__ = metadata

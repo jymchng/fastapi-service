@@ -11,6 +11,7 @@ import inspect
 from fastapi_service.helpers import (
     _is_injectable_instance,
     _get_dependencies_from_signature,
+    _remove_first_n_param_from_signature,
 )
 from fastapi_service.typing import (
     _T,
@@ -21,6 +22,12 @@ from fastapi_service.protocols import (
 )
 from fastapi_service.enums import Scopes
 from fastapi_service.additional_context_manager import AdditionalContextManager
+from fastapi_service.constants import (
+    DUNDER_INIT_KEY,
+    DUNDER_NEW_KEY,
+    OBJECT_INIT_FUNC,
+    OBJECT_NEW_FUNC,
+)
 
 
 @dataclass
@@ -87,8 +94,9 @@ class Container:
     ):
         from fastapi_service.injectable import _InjectableMetadata
 
-        if dependency.__init__ is object.__init__:
-            original_new = getattr(dependency, "__new__", object.__new__)
+        initializer = dependency.__init__
+        if initializer is OBJECT_INIT_FUNC:
+            original_new = getattr(dependency, DUNDER_NEW_KEY, OBJECT_NEW_FUNC)
             original_new_signature = inspect.signature(original_new)
             original_new_params = original_new_signature.parameters
             metadata = _InjectableMetadata(
@@ -97,30 +105,23 @@ class Container:
                 # are always transient
                 scope=Scopes.TRANSIENT,
                 dependencies={},
-                original_init=object.__init__,
+                original_init=OBJECT_INIT_FUNC,
                 original_new=original_new,
                 original_new_params=original_new_params,
             )
             self._registry[dependency] = metadata
 
             return dependency()
-
         # dependency.__init__ is NOT object.__init__
-        init_signature = inspect.signature(dependency.__init__)
-        init_signature_params = init_signature.parameters
-        type_hints = get_type_hints(dependency.__init__)
-
-        ctor = getattr(dependency, "__new__", object.__new__)
-        ctor_signature = inspect.signature(ctor)
-        ctor_signature_params = ctor_signature.parameters
-
-        init_signature = init_signature.replace(
-            parameters=list(init_signature.parameters.values())[1:]
+        intializer_signature = inspect.signature(initializer)
+        init_signature_without_self = _remove_first_n_param_from_signature(
+            intializer_signature
         )
-        dependencies = _get_dependencies_from_signature(init_signature, type_hints)
+        type_hints = get_type_hints(initializer)
+
         resolved_deps = {}
         # metadata_scope = Scopes.SINGLETON
-        for param_name, param in init_signature.parameters.items():
+        for param_name, param in init_signature_without_self.parameters.items():
             # found in oracle, good
             if param_name in additional_context:
                 # even if param.default is not empty, value in additional_context takes priority
@@ -136,7 +137,7 @@ class Container:
             if param is None or param_name not in type_hints:
                 raise ValueError(
                     f"Cannot resolve dependency for parameter '{param_name}' "
-                    f"in {dependency.__name__}.__init__: type hint is missing."
+                    f"in {dependency.__name__}.{DUNDER_INIT_KEY}: type hint is missing."
                 )
 
             if param_name in type_hints:
@@ -151,25 +152,17 @@ class Container:
                 except ValueError as e:
                     raise ValueError(
                         f"Cannot resolve dependency for parameter '{param_name}' "
-                        f"in {dependency.__name__}.__init__."
+                        f"in {dependency.__name__}.{DUNDER_INIT_KEY}."
                     ) from e
             else:
                 raise ValueError(
-                    f"Parameter '{param_name}' in {dependency.__name__}.__init__ "
+                    f"Parameter '{param_name}' in {dependency.__name__}.{DUNDER_INIT_KEY} "
                     f"has no type hint and no default value. "
                     f"The parameter is: {param}. "
                     f"Type hints: {type_hints}."
                 )
-        metadata = _InjectableMetadata(
-            cls=dependency,
-            # auto_resolved dependency, i.e. not decorated with `@singleton(scope=Scopes.SINGLETON)`
-            # are always transient
-            scope=Scopes.TRANSIENT,
-            dependencies=dependencies,
-            original_init=dependency.__init__,
-            original_new=ctor,
-            original_init_params=init_signature_params,
-            original_new_params=ctor_signature_params,
+        metadata = _InjectableMetadata._from_class(
+            klass=dependency, scope=Scopes.TRANSIENT
         )
         self._registry[dependency] = metadata
         return dependency(**resolved_deps)
@@ -228,11 +221,11 @@ class Container:
                 except ValueError as e:
                     raise ValueError(
                         f"Cannot resolve dependency for parameter '{param_name}' "
-                        f"in {dependency.__name__}.__init__."
+                        f"in {dependency.__name__}.{DUNDER_INIT_KEY}."
                     ) from e
             else:
                 raise ValueError(
-                    f"Parameter '{param_name}' in {dependency.__name__}.__init__ "
+                    f"Parameter '{param_name}' in {dependency.__name__}.{DUNDER_INIT_KEY} "
                     f"has no type hint and no default value. "
                     f"The parameter is: {param}. "
                     f"Type hints: {type_hints}."
