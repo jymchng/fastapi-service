@@ -99,6 +99,44 @@ class _InjectableMetadata(Generic[_T]):
                 f"Cannot inject non-singleton-scoped dependency '{dep_type.__name__}' "
                 f"into singleton-scoped '{self.cls.__name__}'"
             )
+            
+            
+    @staticmethod
+    def _from_class(
+        klass: Type[_T],
+        scope: Scopes,
+    ):
+        original_init = (
+            klass.__init__ if hasattr(klass, DUNDER_INIT_KEY) else OBJECT_INIT_FUNC
+        )
+        original_new = (
+            klass.__new__ if hasattr(klass, DUNDER_NEW_KEY) else OBJECT_NEW_FUNC
+        )
+
+        init_signature = inspect.signature(original_init)
+        ctor_signature = inspect.signature(original_new)
+
+        init_signature_params = init_signature.parameters
+        ctor_signature_params = ctor_signature.parameters
+        type_hints = get_type_hints(klass.__init__)
+
+        init_signature_with_first_param_removed = _remove_first_n_param_from_signature(
+            init_signature
+        )
+        dependencies = _get_dependencies_from_signature(
+            init_signature_with_first_param_removed, type_hints
+        )
+        metadata = _InjectableMetadata(
+            cls=klass,
+            scope=scope,
+            dependencies=dependencies,
+            original_init=original_init,
+            original_new=original_new,
+            original_init_params=init_signature_params,
+            original_new_params=ctor_signature_params,
+        )
+        return metadata
+        
 
     def get_instance(
         self,
@@ -237,89 +275,66 @@ def injectable(
     if _cls is None:
         return lambda cls: injectable(cls, scope=scope)
 
-    if hasattr(_cls, DUNDER_INIT_KEY):
-        original_init = _cls.__init__
-        original_new = (
-            _cls.__new__ if hasattr(_cls, DUNDER_NEW_KEY) else OBJECT_NEW_FUNC
-        )
+    original_init = _cls.__init__
+    original_new = (
+        _cls.__new__ if hasattr(_cls, DUNDER_NEW_KEY) else OBJECT_NEW_FUNC
+    )
 
-        ctor_signature = inspect.signature(original_new)
-        ctor_signature_params = ctor_signature.parameters
+    metadata = _InjectableMetadata._from_class(klass=_cls, scope=scope)
+    _cls.__injectable_metadata__ = metadata
 
-        init_signature = inspect.signature(original_init)
-        init_signature_params = init_signature.parameters
-        type_hints = get_type_hints(_cls.__init__)
+    @staticmethod
+    @wraps(original_new)
+    def factory_new(cls_or_subcls, *args, **kwargs):
+        if FASTAPI_REQUEST_KEY not in kwargs:
+            # means we are instantiating it as a normal ass
+            if original_new is not OBJECT_NEW_FUNC:
+                return original_new(cls_or_subcls, *args, **kwargs)
+            return OBJECT_NEW_FUNC(cls_or_subcls)
+        # here we are not instantiating it as a normal class
+        # `Depends` is instantiating it
+        if cls_or_subcls is not _cls:
+            # means `cls_or_subcls` is subcls of `_cls`
+            subcls = cls_or_subcls
+            if original_new is not OBJECT_NEW_FUNC:
+                # `Depends` can still inject the `Request` object into `**kwargs`
+                # so we take it out
+                kwargs.pop(FASTAPI_REQUEST_KEY, None)
+                return original_new(subcls, *args, **kwargs)
+            return OBJECT_NEW_FUNC(subcls)
+        # the actual `_cls`
+        container = Container()
+        return container.resolve(_cls, kwargs)
 
-        init_signature_with_first_param_removed = _remove_first_n_param_from_signature(
-            init_signature
-        )
-        dependencies = _get_dependencies_from_signature(
-            init_signature_with_first_param_removed, type_hints
-        )
+    @wraps(original_init)
+    def factory_init(instance, *args, **kwargs):
+        if FASTAPI_REQUEST_KEY not in kwargs:
+            # means we are instantiating it as a normal ass
+            if original_new is not OBJECT_INIT_FUNC:
+                return original_init(instance, *args, **kwargs)
+            return OBJECT_INIT_FUNC(instance)
+        if type(instance) is not _cls:
+            if original_new is not OBJECT_INIT_FUNC:
+                kwargs.pop(FASTAPI_REQUEST_KEY, None)
+                return original_init(instance, *args, **kwargs)
+            return OBJECT_INIT_FUNC(instance)
 
-        @staticmethod
-        @wraps(original_new)
-        def factory_new(cls_or_subcls, *args, **kwargs):
-            if FASTAPI_REQUEST_KEY not in kwargs:
-                # means we are instantiating it as a normal ass
-                if original_new is not OBJECT_NEW_FUNC:
-                    return original_new(cls_or_subcls, *args, **kwargs)
-                return OBJECT_NEW_FUNC(cls_or_subcls)
-            # here we are not instantiating it as a normal class
-            # `Depends` is instantiating it
-            if cls_or_subcls is not _cls:
-                # means `cls_or_subcls` is subcls of `_cls`
-                subcls = cls_or_subcls
-                if original_new is not OBJECT_NEW_FUNC:
-                    # `Depends` can still inject the `Request` object into `**kwargs`
-                    # so we take it out
-                    kwargs.pop(FASTAPI_REQUEST_KEY, None)
-                    return original_new(subcls, *args, **kwargs)
-                return OBJECT_NEW_FUNC(subcls)
-            # the actual `_cls`
-            container = Container()
-            return container.resolve(_cls, kwargs)
-
-        @wraps(original_init)
-        def factory_init(instance, *args, **kwargs):
-            if FASTAPI_REQUEST_KEY not in kwargs:
-                # means we are instantiating it as a normal ass
-                if original_new is not OBJECT_INIT_FUNC:
-                    return original_init(instance, *args, **kwargs)
-                return OBJECT_INIT_FUNC(instance)
-            if type(instance) is not _cls:
-                if original_new is not OBJECT_INIT_FUNC:
-                    kwargs.pop(FASTAPI_REQUEST_KEY, None)
-                    return original_init(instance, *args, **kwargs)
-                return OBJECT_INIT_FUNC(instance)
-
-        _cls.__init__ = factory_init
-        _cls.__new__ = factory_new
-        _cls.__new__.__signature__ = inspect.Signature(
-            [
-                inspect.Parameter(
-                    "cls_or_subcls",
-                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                    annotation=_cls,
-                ),
-                inspect.Parameter(
-                    FASTAPI_REQUEST_KEY,
-                    inspect.Parameter.KEYWORD_ONLY,
-                    default=inspect.Parameter.empty,
-                    annotation=Request,
-                ),
-            ]
-        )
-
-        metadata = _InjectableMetadata(
-            cls=_cls,
-            scope=scope,
-            dependencies=dependencies,
-            original_init=original_init,
-            original_new=original_new,
-            original_init_params=init_signature_params,
-            original_new_params=ctor_signature_params,
-        )
-        _cls.__injectable_metadata__ = metadata
+    _cls.__init__ = factory_init
+    _cls.__new__ = factory_new
+    _cls.__new__.__signature__ = inspect.Signature(
+        [
+            inspect.Parameter(
+                "cls_or_subcls",
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=_cls,
+            ),
+            inspect.Parameter(
+                FASTAPI_REQUEST_KEY,
+                inspect.Parameter.KEYWORD_ONLY,
+                default=inspect.Parameter.empty,
+                annotation=Request,
+            ),
+        ]
+    )
 
     return _cls
