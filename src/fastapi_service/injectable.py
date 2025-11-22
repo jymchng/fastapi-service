@@ -67,7 +67,13 @@ class _InjectableMetadata(Generic[_T]):
     scope: Scopes = Scopes.TRANSIENT
     dependencies: Dict[str, Type] = field(default_factory=dict)
     original_init: Optional[Callable] = None
+    original_init_params: Optional[Dict[str, inspect.Parameter]] = field(
+        default_factory=dict
+    )
     original_new: Optional[Callable] = None
+    original_new_params: Optional[Dict[str, inspect.Parameter]] = field(
+        default_factory=dict
+    )
     token: Optional[str] = None
 
     _instance: Optional[_T] = None
@@ -152,10 +158,29 @@ class _InjectableMetadata(Generic[_T]):
                         f"into singleton-scoped '{self.cls.__name__}'"
                     )
                 continue
+            parameter = self.original_init_params.get(param_name)
+            default_param_value = (
+                parameter.default if parameter is not None else inspect.Parameter.empty
+            )
+            if default_param_value is not inspect.Parameter.empty:
+                resolved_deps[param_name] = default_param_value
+                continue
             additional_context = additional_context_manager.update_additional_context(
                 dep_type, additional_context
             )
-            resolved_deps[param_name] = container.resolve(dep_type, additional_context)
+            try:
+                resolved_deps[param_name] = container.resolve(
+                    dep_type, additional_context
+                )
+            except Exception as err:
+                dep_type_name = getattr(
+                    dep_type, "__name__", "<unknown>" if dep_type else dep_type
+                )
+                raise ValueError(
+                    f"Parameter with name `{param_name}` and type hint `{dep_type_name}`"
+                    f"cannot be resolved due to: "
+                    f"{err}"
+                ) from err
             self._check_self_scope_dep_scope_are_valid(dep_type, container)
         return resolved_deps
 
@@ -218,7 +243,11 @@ def injectable(
             _cls.__new__ if hasattr(_cls, DUNDER_NEW_KEY) else OBJECT_NEW_FUNC
         )
 
+        ctor_signature = inspect.signature(original_new)
+        ctor_signature_params = ctor_signature.parameters
+
         init_signature = inspect.signature(original_init)
+        init_signature_params = init_signature.parameters
         type_hints = get_type_hints(_cls.__init__)
 
         init_signature_with_first_param_removed = _remove_first_n_param_from_signature(
@@ -288,8 +317,9 @@ def injectable(
             dependencies=dependencies,
             original_init=original_init,
             original_new=original_new,
+            original_init_params=init_signature_params,
+            original_new_params=ctor_signature_params,
         )
-
         _cls.__injectable_metadata__ = metadata
 
     return _cls

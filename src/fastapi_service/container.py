@@ -88,6 +88,9 @@ class Container:
         from fastapi_service.injectable import _InjectableMetadata
 
         if dependency.__init__ is object.__init__:
+            original_new = getattr(dependency, "__new__", object.__new__)
+            original_new_signature = inspect.signature(original_new)
+            original_new_params = original_new_signature.parameters
             metadata = _InjectableMetadata(
                 cls=dependency,
                 # auto_resolved dependency, i.e. not decorated with `@singleton(scope=Scopes.SINGLETON)`
@@ -95,7 +98,8 @@ class Container:
                 scope=Scopes.TRANSIENT,
                 dependencies={},
                 original_init=object.__init__,
-                original_new=getattr(dependency, "__new__", object.__new__),
+                original_new=original_new,
+                original_new_params=original_new_params,
             )
             self._registry[dependency] = metadata
 
@@ -103,7 +107,12 @@ class Container:
 
         # dependency.__init__ is NOT object.__init__
         init_signature = inspect.signature(dependency.__init__)
+        init_signature_params = init_signature.parameters
         type_hints = get_type_hints(dependency.__init__)
+
+        ctor = getattr(dependency, "__new__", object.__new__)
+        ctor_signature = inspect.signature(ctor)
+        ctor_signature_params = ctor_signature.parameters
 
         init_signature = init_signature.replace(
             parameters=list(init_signature.parameters.values())[1:]
@@ -158,7 +167,9 @@ class Container:
             scope=Scopes.TRANSIENT,
             dependencies=dependencies,
             original_init=dependency.__init__,
-            original_new=getattr(dependency, "__new__", object.__new__),
+            original_new=ctor,
+            original_init_params=init_signature_params,
+            original_new_params=ctor_signature_params,
         )
         self._registry[dependency] = metadata
         return dependency(**resolved_deps)
