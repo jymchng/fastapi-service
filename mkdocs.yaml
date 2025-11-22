@@ -1,0 +1,82 @@
+site_name: FastAPI Service
+site_description: Effortless Dependency Injection for FastAPI.
+site_url: https://fastapi-service.asyncmove.com/
+repo_url: https://github.com/jymchng/fastapi-service
+repo_name: jymchng/fastapi-service
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  # The 'material' theme is the gold standard for Python docs
+  palette: 
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: purple
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: lime
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - content.code.annotate
+
+# Extensions for better code blocks, admonitions (notes/warnings), and mermaid diagrams
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+
+# Plugins: Search is default. mkdocstrings is ESSENTIAL for Python libs.
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src] # Adjust if your source code is in a different folder
+          options:
+            show_root_heading: true
+            show_source: true
+
+# The Information Architecture
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quick-start.md
+      - Tutorial: getting-started/tutorial.md
+  - Core Concepts:
+      - Dependency Injection: concepts/dependency-injection.md
+      - Scopes & Lifecycles: concepts/scopes.md
+      - The @injectable Decorator: concepts/injectable.md
+  - Advanced Usage:
+      - Plain Object Injection: advanced/plain-objects.md
+      - Legacy Migration Guide: advanced/migration.md
+      - Integrating with FastAPI Depends: advanced/fastapi-integration.md
+      - Technical Architecture: advanced/architecture.md
+  - API Reference:
+      - Service: reference/service.md
+      - Decorators: reference/decorators.md
+      - Scopes: reference/scopes.md
+  - Contributing: contributing.md
+  - License: license.md
