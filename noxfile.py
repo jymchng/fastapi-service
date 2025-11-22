@@ -110,24 +110,30 @@ if TYPE_EXTENSIONS_IMPORTED and TYPE_CHECKING:
 
 
 # Fundamental Variables
-ROOT_DIR: str = os.path.dirname(os.path.abspath(__file__))
+SRC_DIR_NAME = "src"
 MANIFEST_FILENAME = "pyproject.toml"
+NOXFILE_NAME = "noxfile"
+
+DIST_DIR_NAME: str = "dist"
+BUILD_DIR_NAME: str = "build"
+TEST_DIR_NAME: str = "tests"
+EXAMPLES_DIR_NAME: str = "examples"
+
+ROOT_DIR: str = os.path.dirname(os.path.abspath(__file__))
 PROJECT_MANIFEST = load_toml(MANIFEST_FILENAME)
 PROJECT_NAME: str = PROJECT_MANIFEST["project"]["name"]
 PROJECT_NAME_NORMALIZED: str = PROJECT_NAME.replace("-", "_").replace(" ", "_")
-SRC_DIR_NAME = "src"
 SRC_DIR_PATH = pathlib.Path(SRC_DIR_NAME)
-NOXFILE_NAME = "noxfile"
 NOXFILE_WITH_EXT_NAME = f"{NOXFILE_NAME}.py"
 
 _PROJECT_CODES_DIR: str = os.path.join(SRC_DIR_NAME, PROJECT_NAME_NORMALIZED)
 PROJECT_CODES_DIR: str = (
     _PROJECT_CODES_DIR if os.path.exists(_PROJECT_CODES_DIR) else "."
 )
-DIST_DIR: str = os.path.join(ROOT_DIR, "dist")
-BUILD_DIR: str = os.path.join(ROOT_DIR, "build")
-TEST_DIR: str = os.path.join(ROOT_DIR, "tests")
-EXAMPLES_DIR: str = os.path.join(ROOT_DIR, "examples")
+DIST_DIR: str = os.path.join(ROOT_DIR, DIST_DIR_NAME)
+BUILD_DIR: str = os.path.join(ROOT_DIR, BUILD_DIR_NAME)
+TEST_DIR: str = os.path.join(ROOT_DIR, TEST_DIR_NAME)
+EXAMPLES_DIR: str = os.path.join(ROOT_DIR, EXAMPLES_DIR_NAME)
 
 
 # Statics

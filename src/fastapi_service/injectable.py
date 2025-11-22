@@ -16,7 +16,6 @@ from dataclasses import dataclass, field
 
 from fastapi_service.enums import Scopes
 from fastapi_service.helpers import (
-    _get_injectable_metadata,
     _is_injectable_instance,
     _get_dependencies_from_signature,
     _remove_first_n_param_from_signature,

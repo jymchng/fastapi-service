@@ -50,8 +50,6 @@ def _remove_first_n_param_from_signature(
 def _get_dependencies_from_signature(
     signature_: inspect.Signature, type_hints: dict[str, Any]
 ) -> Dict[str, Optional[Any]]:
-    # from fastapi_service.injectable import _InjectableMetadata
-
     return {
         name: type_hints.get(name)
         for name, _ in list(signature_.parameters.items())
@@ -163,9 +161,3 @@ def _is_injectable_instance(obj: Any) -> TypeIs[InjectableProtocol]:
     """Check if an object is an instance of an injectable class."""
     return isinstance(obj, InjectableProtocol)
 
-
-def _get_injectable_metadata(cls: Type[_T]) -> "Optional[_InjectableMetadata[_T]]":
-    """Get injectable metadata from class."""
-    if not _is_injectable_instance(cls):
-        return None
-    return cls.__injectable_metadata__
