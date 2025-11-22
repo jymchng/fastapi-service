@@ -1,274 +1,270 @@
-# fastapi-service
+# FastAPI Service
 
-[![version](https://img.shields.io/badge/version-0.1.0-blue.svg)](pyproject.toml)
-[![Build](https://img.shields.io/badge/build-nox-success.svg)](noxfile.py)
-[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A590%25-brightgreen.svg)](pytest.ini)
-[![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](#license)
+[](https://www.google.com/search?q=https://badge.fury.io/py/fastapi-service)
+[](https://opensource.org/licenses/MIT)
+[](https://www.python.org/downloads/)
 
-A lightweight dependency injection layer for FastAPI. It provides an `@injectable` decorator to mark classes for injection, a minimal `Container` to resolve dependencies, and seamless integration with FastAPI’s `Depends`. It supports singleton/transient scopes, auto-resolution from type hints, request-scoped resolution, and circular dependency detection.
+**Effortless Dependency Injection for FastAPI.**
 
-## Table of Contents
+`fastapi-service` is a lightweight, zero-boilerplate dependency injection library designed specifically for FastAPI. It bridges the gap between complex enterprise DI containers and FastAPI's native `Depends` system, making your code cleaner, more testable, and easier to migrate.
 
-- [Installation](#installation)
-- [Quickstart](#quickstart)
-- [Usage Guide](#usage-guide)
-- [API Overview](#api-overview)
-- [Configuration](#configuration)
-- [Features](#features)
-- [Troubleshooting](#troubleshooting)
-- [Testing](#testing)
-- [Development](#development)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
-- [FAQ](#faq)
-- [Contact](#contact)
+## 🚀 Why use this?
 
-## Installation
+FastAPI's dependency injection is powerful, but as your application grows, managing deeply nested dependencies can become verbose. `fastapi-service` solves this by introducing a simple `@injectable` decorator that handles the wiring for you, while staying 100% compatible with standard FastAPI patterns.
 
-### Prerequisites
+### Key Features
 
-- Python 3.9+
-- FastAPI
-- Optional: Nox for automation; pytest/pytest-cov for testing
+  * **Simple APIs**: Just add `@injectable` to your classes. No configuration files, no complex setup.
+  * **Deep FastAPI Integration**: Works directly with `Depends()`. No need to learn a new framework.
+  * **Support for Plain Classes**: Inject classes you didn't write or don't want to decorate (like third-party libraries).
+  * **Gradual Migration**: Adopt it incrementally. Perfect for refactoring legacy codebases without rewriting everything at once.
 
-### Setup
+-----
+
+## 📦 Installation
 
 ```bash
-# Clone
-git clone <repo-url>
-cd fastapi-service
-
-# Install with uv (recommended) or pip
-uv pip install -e .
-# or
-python -m pip install -e .
-
-# Run tests
-python -m pytest -q
-
-# Using Nox (optional)
-nox -s test
+pip install fastapi-service
 ```
 
-### Configuration
+-----
 
-- `PYTHONPATH` should include `src` for a src-layout project.
-- Environment variables:
-  - `TEST_LOAD_FACTOR`: controls performance test load (default `25`).
+## ⚡ Quick Start
 
-## Quickstart
+### 1\. Define your services
+
+Simply decorate your classes with `@injectable`. Dependencies defined in `__init__` are automatically resolved.
 
 ```python
-from fastapi import FastAPI
-from fastapi_service.injectable import injectable, Depends
-from fastapi_service.enums import Scopes
-
-@injectable(scope=Scopes.SINGLETON)
-class Database:
-    def __init__(self):
-        self.url = "sqlite://"
+from fastapi_service import injectable
 
 @injectable
-class Users:
-    def __init__(self, db: Database):
+class DatabaseService:
+    def get_connection(self):
+        return "Database Connection"
+
+@injectable
+class UserService:
+    # DatabaseService is automatically injected!
+    def __init__(self, db: DatabaseService):
         self.db = db
-    def all(self):
-        return ["alice", "bob"]
+
+    def get_user(self, user_id: int):
+        conn = self.db.get_connection()
+        return {"id": user_id, "name": "John Doe", "connection": conn}
+```
+
+### 2\. Use in FastAPI
+
+Use your services in routes exactly like you would with standard FastAPI dependencies.
+
+```python
+from fastapi import FastAPI, Depends
+from .services import UserService
 
 app = FastAPI()
 
-@app.get("/users")
-def list_users(svc: Users = Depends(Users)):
-    return svc.all()
+@app.get("/users/{user_id}")
+def read_user(user_id: int, service: UserService = Depends(UserService)):
+    return service.get_user(user_id)
 ```
 
-### Common Commands
+-----
 
-```bash
-# Run unit/integration/security/performance tests
-python -m pytest -q
+## 🔌 Injecting Plain Objects & Third-Party Classes
 
-# With coverage gate (90%):
-python -m pytest --cov=src/fastapi_service --cov-report=term-missing
+You don't always have control over the classes you need to use. Whether it's a legacy utility class you can't touch yet, or a client from a third-party library (like `httpx` or `boto3`), `fastapi-service` has you covered.
 
-# Nox helpers
-nox -s test
-nox -s benchmark
-```
+**You do not need to put `@injectable` on everything.**
 
-## Usage Guide
-
-Endpoint injection:
+If an `@injectable` service depends on a plain class, the library will automatically attempt to instantiate and inject it for you.
 
 ```python
-from fastapi import FastAPI
-from fastapi_service import injectable, Depends
+# --- legacy_utils.py ---
+# This is a plain class. No decorators. 
+# Maybe it comes from a library you can't edit!
+class SimpleLogger:
+    def log(self, message: str):
+        print(f"[Legacy Log]: {message}")
+
+# --- services.py ---
+from fastapi_service import injectable
+from .legacy_utils import SimpleLogger
 
 @injectable
-class GreetingService:
-    def greet(self, name: str) -> str:
-        return f"Hello, {name}"
+class OrderService:
+    # SimpleLogger is NOT decorated, but it is injected automatically.
+    def __init__(self, logger: SimpleLogger):
+        self.logger = logger
 
-app = FastAPI()
-
-@app.get("/greet/{name}")
-def greet(name: str, svc: GreetingService = Depends(GreetingService)):
-    return {"message": svc.greet(name)}
+    def create_order(self, item: str):
+        self.logger.log(f"Order created for {item}")
 ```
 
-Singleton shared across routes:
+This feature is incredibly powerful for integrating:
+
+  * **Third-party clients** (e.g., SDKs that don't use injection).
+  * **Legacy code** during a gradual refactor.
+  * **Data classes** or simple utilities.
+
+-----
+
+## 🔄 Migration Guide (Gradual Adoption)
+
+One of the biggest strengths of `fastapi-service` is its ability to fit into existing projects without breaking changes. You don't need to convert your entire codebase overnight.
+
+### Step 1: The Legacy Codebase
+
+Imagine you have a standard class that isn't using any dependency injection.
 
 ```python
-from fastapi_service import injectable, Depends, Scopes
+# legacy.py
+class LegacyEmailSender:
+    def send(self, msg):
+        print(f"Sending {msg}")
+```
+
+### Step 2: The Hybrid Approach
+
+You can write a new service using `@injectable` that depends on the legacy class. Because of the **Plain Object Injection** feature (see above), you don't even need to modify `legacy.py`\!
+
+```python
+from fastapi_service import injectable
+from .legacy import LegacyEmailSender
+
+@injectable
+class NotificationService:
+    # LegacyEmailSender is injected automatically without a decorator
+    def __init__(self, sender: LegacyEmailSender):
+        self.sender = sender 
+
+    def notify(self, message: str):
+        self.sender.send(message)
+```
+
+### Step 3: Full Modernization
+
+When you are ready, you *can* add `@injectable` to the legacy class if you want it to manage its own dependencies, but it is strictly optional.
+
+-----
+
+## 🧩 Deep Integration with `Depends`
+
+`fastapi-service` is built *on top* of FastAPI's dependency system, not *instead* of it. This means you can mix `@injectable` services with standard FastAPI `Depends` functions.
+
+```python
+from fastapi import Header, Depends
+from fastapi_service import injectable
+
+# A standard FastAPI dependency function
+def get_user_agent(user_agent: str = Header(default=None)):
+    return user_agent
+
+@injectable
+class AnalyticsService:
+    # Injecting a standard FastAPI dependency into a service class!
+    def __init__(self, user_agent: str = Depends(get_user_agent)):
+        self.user_agent = user_agent
+
+    def log_access(self):
+        print(f"Access from: {self.user_agent}")
+```
+
+-----
+
+## 🛡️ Scopes & Scope Safety
+
+`fastapi-service` provides robust scope management to ensure your application's lifecycle is handled correctly. We support two primary scopes:
+
+  * **`Scopes.TRANSIENT` (Default):** A new instance is created for every injection. This is standard FastAPI behavior.
+  * **`Scopes.SINGLETON`:** The same instance is shared across the entire application lifetime.
+
+### Preventing "Scope Leaks"
+
+A common pitfall in dependency injection is injecting a short-lived object (Transient) into a long-lived object (Singleton). This causes the short-lived object to "live forever" inside the singleton, often leading to stale database sessions or thread-safety issues.
+
+`fastapi-service` **validates your dependency graph at runtime**. When a service is requested, the library checks the entire chain. If you attempt to inject a `TRANSIENT` service into a `SINGLETON` service, it will detect the mismatch and raise an error, preventing unstable behavior.
+
+```python
+from fastapi_service import injectable, Scopes
+
+# ❌ ERROR: You cannot inject this Transient service...
+@injectable(scope=Scopes.TRANSIENT)
+class DatabaseSession:
+    pass
+
+# ...into this Singleton service.
+@injectable(scope=Scopes.SINGLETON)
+class GlobalCache:
+    def __init__(self, session: DatabaseSession):
+        self.session = session
+```
+
+**Correct Usage:**
+Singletons should only depend on other Singletons or stateless configurations.
+
+```python
+@injectable(scope=Scopes.SINGLETON)
+class ConnectionPool:
+    pass
 
 @injectable(scope=Scopes.SINGLETON)
-class Counter:
-    def __init__(self):
-        self.count = 0
-    def inc(self):
-        self.count += 1
-        return self.count
-
-@app.get("/c1")
-def c1(svc: Counter = Depends(Counter)):
-    return {"count": svc.inc()}
-
-@app.get("/c2")
-def c2(svc: Counter = Depends(Counter)):
-    return {"count": svc.inc()}
+class UserRepository:
+    def __init__(self, pool: ConnectionPool):
+        self.pool = pool
 ```
 
-Async dependencies:
+-----
+
+## 🔧 Under the Hood: Technical Architecture
+
+`fastapi-service` is designed to be a **structural analyzer** that leverages Python's native metaprogramming capabilities to prepare your classes for FastAPI's dependency resolution system.
+
+Here is the step-by-step breakdown of the injection lifecycle:
+
+### 1\. Introspection & Registration
+
+When you decorate a class with `@injectable`, the library utilizes Python's `inspect` module and `typing.get_type_hints` to analyze the `__init__` constructor. It registers the class and its type hints, preparing them for future resolution.
+
+### 2\. Dynamic Signature Rewriting (The "Magic")
+
+This is the core mechanism that enables integration with FastAPI. `fastapi-service` dynamically generates a **factory function** for each service.
+
+The library constructs a new `inspect.Signature` for this factory, programmatically inserting `fastapi.Depends(...)` into the default values of the function parameters.
+
+Essentially, it automates the translation from:
 
 ```python
-@injectable
-class AsyncSvc:
-    async def process(self):
-        return "ok"
-
-@app.get("/async")
-async def route(svc: AsyncSvc = Depends(AsyncSvc)):
-    return {"result": await svc.process()}
+# Your clean code
+class UserService:
+    def __init__(self, db: Database): ...
 ```
 
-### Diagram
+To the verbose definition FastAPI expects:
 
-```
-[Request] → FastAPI → Depends/Inject → Container.resolve → Instance
-```
-
-## Features
-
-- Scopes with `Scopes.SINGLETON` and `Scopes.TRANSIENT`
-- `@injectable` decorator attaches metadata and auto-discovers dependencies from type hints
-- `Container.resolve` auto-resolves classes and functions using type hints
-- Request-scoped resolution by passing the FastAPI `Request` through `Inject`/`Depends`
-- Integration with regular FastAPI `Depends` and an `Inject` convenience wrapper
-- Circular dependency detection
-- Errors for missing type hints without defaults, and non-class dependency types
-
-## API Overview
-
-- `injectable(scope: Scopes = Scopes.TRANSIENT)`: Decorate a class as injectable, capturing its constructor type hints and scope.
-- `Container.resolve(dependency, additional_context: dict = {})`: Resolve a dependency. Supports singleton caching, transient instantiation, auto-resolution for undecorated classes/functions, and FastAPI request context.
-- `Container.clear()`: Clear registry/cache; useful for tests.
-- `Inject(dependency, use_cache=True, container=None)`: Convenience wrapper producing a FastAPI `Depends` object that wires request context for DI.
-- `Depends(dependency, use_cache=True, container=None)`: Alias of `Inject`.
-- `helpers.get_body_field_should_embed_from_request(dependant, path_format)`: Inspect an endpoint and determine body embedding behavior.
-- `helpers.get_body_from_request(request, body_field=None)`: Parse request body as JSON or bytes, raising `RequestValidationError` for invalid JSON.
-- `helpers.get_solved_dependencies(request, endpoint, dependency_cache)`: Solve FastAPI dependencies for a given callable in the context of a request.
-- `protocols.InjectableProtocol`: Runtime-checkable protocol used internally to detect injectable classes.
-
-## Configuration
-
-- `FASTAPI_REQUEST_KEY`: internal key used to pass `Request` into resolution.
-- `TEST_LOAD_FACTOR`: performance tests load factor; default `25` (see `tests/conftest.py`).
-- Nox sessions for automation: `test`, `benchmark`, `check`, `lint`, `build` (see `noxfile.py`).
-
-## Troubleshooting
-
-- Import errors in `injectable`: ensure module imports reference `fastapi_service.*`
-- Undecorated classes must have type hints; otherwise resolution fails
-- Use `Container.clear()` to reset singleton instances during testing
-- Ensure `src` is on `PYTHONPATH` or added via `sys.path` in tests
-
-## Testing
-
-Run the suite:
-
-```bash
-python -m pytest
+```python
+# What FastAPI sees internally
+def user_service_factory(db: Database = Depends(database_factory)):
+    return UserService(db=db)
 ```
 
-Coverage:
+### 3\. Runtime Graph Resolution & Validation
 
-```bash
-python -m pytest --cov=src/fastapi_service --cov-report=term-missing
-```
+Currently, validation occurs dynamically at runtime during the dependency resolution phase.
 
-Performance tests:
+  * **Scope Safety:** When a dependency is instantiated, the library verifies that no `Scopes.SINGLETON` service is attempting to hold onto a `Scopes.TRANSIENT` service.
+  * **Cycle Detection:** Standard Python recursion limits and dependency resolution mechanics naturally prevent infinite loops.
 
-- Controlled by `TEST_LOAD_FACTOR` (default `25`). Increase locally to stress-test.
+*Note: Future versions of `fastapi-service` aim to move these validations to build-time (startup) to catch configuration errors even earlier.*
 
-Integration tests:
+### 4\. Native Execution Strategy
 
-- Use FastAPI’s `TestClient` to validate endpoint behaviors and DI.
+Because the library translates your structure into standard FastAPI dependency chains, you retain all the performance benefits of FastAPI's asynchronous execution model. The "magic" happens only during the wiring phase; the execution is pure FastAPI.
 
-Security tests:
+## 🤝 Contributing
 
-- Validate input, auth, and data protection patterns.
+Contributions are welcome\! Please read our contributing guidelines to get started.
 
-Nox helpers:
+## 📄 License
 
-```bash
-nox -s test
-nox -s benchmark
-nox -s check
-nox -s lint
-nox -s build
-```
-
-## Development
-
-### Contribution Guidelines
-
-- Create feature branches and use conventional commits.
-- Add unit/integration tests for new behavior; maintain coverage ≥ 90%.
-- Follow existing code style; prefer type hints and explicit DI.
-
-### Code of Conduct
-
-- Be respectful and collaborative; report violations via project issues.
-
-### Build/Deployment
-
-```bash
-nox -s build
-```
-
-Release helpers exist in `noxfile.py` (e.g., `release_check`, `version_sync`).
-
-## License
-
-MIT License. See `LICENSE` for details.
-
-## Acknowledgments
-
-- FastAPI for the dependency system and testing utilities.
-- Starlette for the ASGI underpinnings.
-
-## FAQ
-
-- Why another DI layer?
-  - Minimal, explicit DI aligned with FastAPI’s `Depends` while offering lifecycle scopes and auto-resolution.
-
-- Do I need to decorate every class?
-  - No. Undecorated classes/functions with type hints can be auto-resolved, but `@injectable` enables lifecycle and metadata capture.
-
-- How do I inject `Request` or path/query params?
-  - Use FastAPI parameters in constructor type hints and route wiring; request context is passed via `Depends`/`Inject`.
-
-## Contact
-
-- Maintainers: open issues and PRs on the repository.
-- For security disclosures, contact the maintainers privately.
+This project is licensed under the terms of the MIT license.
