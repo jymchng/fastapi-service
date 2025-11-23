@@ -77,6 +77,11 @@ class _InjectableMetadata(Generic[_T]):
 
     _instance: Optional[_T] = None
 
+    def owned_by(
+        self,
+    ) -> Type[_TInjectable[_T]]:
+        return self.cls
+
     def _dep_has_invalid_scope(
         self, dep_type: Type[_T], container: "Optional[ContainerProtocol]" = None
     ) -> None:

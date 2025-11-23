@@ -27,8 +27,30 @@ class ContainerProtocol(Protocol):
 class MetadataProtocol(Protocol[_T]):
     """Protocol for dependency injection container."""
 
+    def owned_by(
+        self,
+    ) -> Type[_TInjectable[_T]]: ...
+
     def get_instance(
         self,
+        container: ContainerProtocol,
+        additional_context: Dict[str, Any],
+    ) -> _T: ...
+
+
+@runtime_checkable
+class OracleProtocol(Protocol):
+    """Oracles magically has the solution to resolving a dependency."""
+
+    def can_resolve(
+        self,
+        dependency: Type[_TInjectable[_T]],
+        container: ContainerProtocol,
+    ) -> bool: ...
+
+    def resolve(
+        self,
+        dependency: Type[_TInjectable[_T]],
         container: ContainerProtocol,
         additional_context: Dict[str, Any],
     ) -> _T: ...

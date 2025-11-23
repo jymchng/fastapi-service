@@ -160,4 +160,3 @@ async def get_solved_dependencies(
 def _is_injectable_instance(obj: Any) -> TypeIs[InjectableProtocol]:
     """Check if an object is an instance of an injectable class."""
     return isinstance(obj, InjectableProtocol)
-

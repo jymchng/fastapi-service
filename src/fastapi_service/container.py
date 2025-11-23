@@ -78,8 +78,9 @@ class Container:
 
             if _is_injectable_instance(dependency):
                 metadata = dependency.__injectable_metadata__
-                if metadata.cls is dependency:
-                    self._registry[metadata.cls] = metadata
+                metadata_owner = metadata.owned_by()
+                if metadata_owner is dependency:
+                    self._registry[metadata_owner] = metadata
                     return metadata.get_instance(self, additional_context)
 
             return self._auto_resolve(dependency, additional_context)
