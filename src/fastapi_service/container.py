@@ -11,6 +11,7 @@ import inspect
 from fastapi_service.helpers import (
     _is_injectable_instance,
     _get_dependencies_from_signature,
+    _make_fake_function_with_same_signature,
     _remove_first_n_param_from_signature,
 )
 from fastapi_service.typing import (
@@ -19,15 +20,16 @@ from fastapi_service.typing import (
 )
 from fastapi_service.protocols import (
     MetadataProtocol,
+    OracleProtocol,
 )
 from fastapi_service.enums import Scopes
-from fastapi_service.additional_context_manager import AdditionalContextManager
 from fastapi_service.constants import (
     DUNDER_INIT_KEY,
     DUNDER_NEW_KEY,
     OBJECT_INIT_FUNC,
     OBJECT_NEW_FUNC,
 )
+from fastapi_service.oracle import NullOracle
 
 
 @dataclass
@@ -52,9 +54,8 @@ class Container:
     def resolve(
         self,
         dependency: Type[_TInjectable[_T]],
-        additional_context: Dict[str, Any] = None,
+        oracle: "OracleProtocol[_T]" = NullOracle(),
     ) -> _T:
-        additional_context = additional_context or {}
         if dependency in self._resolving:
             chain = " -> ".join([d.__name__ for d in self._resolving])
             raise ValueError(
@@ -67,23 +68,23 @@ class Container:
             if isinstance(dependency, str):
                 if dependency in self._token_metadata_registry:
                     metadata = self._token_metadata_registry[dependency]
-                    return metadata.get_instance(self, additional_context)
+                    return metadata.get_instance(self, oracle)
 
             if isinstance(dependency, MetadataProtocol):
-                return dependency.get_instance(self, additional_context)
+                return dependency.get_instance(self, oracle)
 
             if dependency in self._registry:
                 metadata = self._registry[dependency]
-                return metadata.get_instance(self, additional_context)
+                return metadata.get_instance(self, oracle)
 
             if _is_injectable_instance(dependency):
                 metadata = dependency.__injectable_metadata__
                 metadata_owner = metadata.owned_by()
                 if metadata_owner is dependency:
                     self._registry[metadata_owner] = metadata
-                    return metadata.get_instance(self, additional_context)
+                    return metadata.get_instance(self, oracle)
 
-            return self._auto_resolve(dependency, additional_context)
+            return self._auto_resolve(dependency, oracle)
 
         finally:
             self._resolving.discard(dependency)
@@ -91,7 +92,7 @@ class Container:
     def _auto_resolve_by_class(
         self,
         dependency: Type[_T],
-        additional_context: Dict[str, Any] = None,
+        oracle: "OracleProtocol[_T]",
     ):
         from fastapi_service.injectable import _InjectableMetadata
 
@@ -118,6 +119,10 @@ class Container:
         init_signature_without_self = _remove_first_n_param_from_signature(
             intializer_signature
         )
+        fake_function_with_same_signature = _make_fake_function_with_same_signature(
+            init_signature_without_self
+        )
+        additional_context = oracle.get_context(fake_function_with_same_signature)
         type_hints = get_type_hints(initializer)
 
         resolved_deps = {}
@@ -144,9 +149,7 @@ class Container:
             if param_name in type_hints:
                 dep_type = type_hints[param_name]
                 try:
-                    resolved_deps[param_name] = self.resolve(
-                        dep_type, additional_context
-                    )
+                    resolved_deps[param_name] = self.resolve(dep_type, oracle)
                     # param_metadata = self._registry.get(dep_type)
                     # if param_metadata is not None:
                     #     metadata_scope = max(metadata_scope, param_metadata.scope)
@@ -169,22 +172,19 @@ class Container:
         return dependency(**resolved_deps)
 
     def _auto_resolve(
-        self, dependency: Type, additional_context: Dict[str, Any] = None
+        self,
+        dependency: Type,
+        oracle: OracleProtocol[_T],
     ) -> Any:
-        additional_context_manager = AdditionalContextManager(additional_context)
-        additional_context = additional_context_manager.update_additional_context(
-            dependency, additional_context
-        )
         from fastapi_service.injectable import _InjectableMetadata
 
-        additional_context = additional_context or {}
-
         if isinstance(dependency, type):
-            return self._auto_resolve_by_class(dependency, additional_context)
+            return self._auto_resolve_by_class(dependency, oracle)
 
         if not callable(dependency):
             raise ValueError(f"Cannot auto-resolve non-class type: {dependency}")
 
+        additional_context = oracle.get_context(dependency)
         call_signature = inspect.signature(dependency)
         type_hints = get_type_hints(dependency)
 
@@ -213,9 +213,7 @@ class Container:
             if param_name in type_hints:
                 dep_type = type_hints[param_name]
                 try:
-                    resolved_deps[param_name] = self.resolve(
-                        dep_type, additional_context
-                    )
+                    resolved_deps[param_name] = self.resolve(dep_type, oracle)
                     param_metadata = self._registry.get(dep_type)
                     if param_metadata is not None:
                         metadata_scope = max(metadata_scope, param_metadata.scope)
@@ -231,12 +229,23 @@ class Container:
                     f"The parameter is: {param}. "
                     f"Type hints: {type_hints}."
                 )
+        original_init = (
+            dependency.__init__
+            if hasattr(dependency, DUNDER_INIT_KEY)
+            else OBJECT_INIT_FUNC
+        )
+        original_new = (
+            dependency.__new__
+            if hasattr(dependency, DUNDER_NEW_KEY)
+            else OBJECT_NEW_FUNC
+        )
+
         metadata = _InjectableMetadata(
             cls=dependency,
             scope=metadata_scope,
             dependencies=dependencies,
-            original_init=None,
-            original_new=dependency,
+            original_init=original_init,
+            original_new=original_new,
         )
         self._registry[dependency] = metadata
         return dependency(**resolved_deps)

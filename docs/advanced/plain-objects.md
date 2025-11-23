@@ -1,495 +1,459 @@
 # Plain Object Injection
 
-Plain Object Injection is a powerful feature that lets you inject **classes without the `@injectable` decorator**. This is essential for integrating third-party libraries, legacy code, and classes you don't control.
+FastAPI Service can inject dependencies into regular Python classes without requiring the `@injectable` decorator. This is useful for third-party classes, data transfer objects, and simple utility classes.
 
-## What is Plain Object Injection?
+## When Plain Object Injection Works
 
-Plain Object Injection automatically resolves and injects classes **not** decorated with `@injectable`. The library analyzes the class constructor, inspects type hints, and resolves dependencies dynamically.
+Plain object injection works when:
 
-### Key Difference: Decorated vs Plain Classes
+1. The class has a constructor that can be analyzed via type hints
+2. All constructor parameters either:
+   - Have default values
+   - Are registered services (decorated with `@injectable`)
+   - Are primitive types with defaults
 
-```python
-# Decorated class (explicit opt-in)
-@injectable
-class ExplicitService:
-    def __init__(self, db: DatabaseService):
-        self.db = db
-
-# Plain class (auto-detected)
-class PlainService:
-    def __init__(self, db: DatabaseService):
-        self.db = db
-
-@injectable
-class ConsumerService:
-    def __init__(self, explicit: ExplicitService, plain: PlainService):
-        self.explicit = explicit
-        self.plain = plain  # PlainService is injected automatically!
-```
-
-**Why this matters**: You can't add `@injectable` to classes from external libraries or legacy codebases. Plain Object Injection solves this without wrappers or adapters.
-
-## When Plain Injection Works
-
-Plain injection works when these conditions are met:
-
-### 1. Type Hints Are Required
+## Basic Plain Object Injection
 
 ```python
-# ✅ Works: Type hints present
-class ValidService:
-    def __init__(self, db: DatabaseService, cache: CacheService):
-        self.db = db
+# A regular class (no decorator needed)
+class SimpleCache:
+    def __init__(self, ttl: int = 300):  # Default value allows plain injection
+        self.ttl = ttl
+        self._cache = {}
+    
+    def get(self, key: str):
+        return self._cache.get(key)
+    
+    def set(self, key: str, value: str):
+        self._cache[key] = value
+
+# Inject plain object into decorated service
+@injectable
+class UserService:
+    def __init__(self, cache: SimpleCache):  # Plain object injected!
         self.cache = cache
-
-@injectable
-class Consumer:
-    def __init__(self, service: ValidService):  # Auto-injected
-        self.service = service
-
-# ❌ Fails: Missing type hints
-class InvalidService:
-    def __init__(self, database):  # No type hint!
-        self.db = database
-
-@injectable
-class BadConsumer:
-    def __init__(self, service: InvalidService):  # Error: Cannot resolve
-        self.service = service
+    
+    def get_user(self, user_id: int):
+        cached = self.cache.get(f"user:{user_id}")
+        if cached:
+            return cached
+        # ... fetch from database
+        user = {"id": user_id, "name": "John Doe"}
+        self.cache.set(f"user:{user_id}", user)
+        return user
 ```
 
-### 2. Primitive Types Need Default Values
+## Complex Dependencies with Plain Objects
 
 ```python
-# ✅ Works: Primitives have defaults
-class ConfiguredService:
-    def __init__(self, db: DatabaseService, timeout: int = 30):
-        self.db = db
-        self.timeout = timeout
-
-# ❌ Fails: Primitive without default
-class BrokenService:
-    def __init__(self, db: DatabaseService, timeout: int):  # No default!
-        self.db = db
-        self.timeout = timeout
+# Plain object with multiple dependencies
+class WeatherCache:
+    def __init__(self, config: ConfigService, ttl: int = 3600):  # Mixed dependencies
+        self.config = config
+        self.ttl = ttl
+        self._cache = {}
+    
+    def get_weather(self, city: str):
+        return self._cache.get(city)
+    
+    def set_weather(self, city: str, data: dict):
+        self._cache[city] = data
 
 @injectable
-class Consumer:
-    def __init__(self, service: BrokenService):  # Error: Cannot resolve 'timeout'
-        self.service = service
+class WeatherService:
+    def __init__(self, cache: WeatherCache):
+        self.cache = cache
+    
+    def get_weather(self, city: str):
+        cached = self.cache.get_weather(city)
+        if cached:
+            return cached
+        # ... fetch from API
+        weather = {"city": city, "temp": "22°C"}
+        self.cache.set_weather(city, weather)
+        return weather
 ```
 
-### 3. Dependencies Must Be Injectable or Plain-Resolvable
-
-```python
-@injectable
-class DatabaseService: pass
-
-# ✅ Works: Depends on injectable service
-class Repository:
-    def __init__(self, db: DatabaseService):
-        self.db = db
-
-@injectable
-class Service:
-    def __init__(self, repo: Repository):  # Repository is auto-injected
-        self.repo = repo
-```
-
-## Common Use Cases
-
-### 1. Third-Party Library Classes
+## Third-Party Class Integration
 
 ```python
 import httpx
 from fastapi_service import injectable
 
-# httpx.AsyncClient has no @injectable decorator
-# But we can inject it automatically!
-@injectable
+# Third-party class (can't be decorated)
 class APIClient:
-    def __init__(self, config: ConfigService):
-        # httpx.AsyncClient uses plain injection
+    def __init__(self, base_url: str, timeout: int = 30):
+        self.base_url = base_url
+        self.timeout = timeout
         self.client = httpx.AsyncClient(
-            base_url=config.get("api_url"),
-            timeout=httpx.Timeout(30.0)
+            base_url=base_url,
+            timeout=httpx.Timeout(timeout)
         )
     
     async def get(self, endpoint: str):
-        return await self.client.get(endpoint)
+        response = await self.client.get(endpoint)
+        return response.json()
 
+# Adapter pattern for complex setup
 @injectable
-class UserService:
-    def __init__(self, api: APIClient):
-        self.api = api
+class ConfiguredAPIClient:
+    def __init__(self, config: ConfigService):
+        self.client = APIClient(
+            base_url=config.get("api_base_url"),
+            timeout=config.get("api_timeout", 30)
+        )
+    
+    async def get_user(self, user_id: int):
+        return await self.client.get(f"/users/{user_id}")
+
+# Use in service
+@injectable
+class UserAPIService:
+    def __init__(self, api_client: ConfiguredAPIClient):
+        self.api_client = api_client
     
     async def fetch_user(self, user_id: int):
-        return await self.api.get(f"/users/{user_id}")
+        return await self.api_client.get_user(user_id)
 ```
 
-### 2. Legacy Code Integration
+## Data Transfer Objects (DTOs)
 
 ```python
-# legacy_module.py (cannot modify)
-class LegacyLogger:
-    def __init__(self, log_file: str = "app.log"):  # Has default
-        self.log_file = log_file
-    
-    def log(self, message: str):
-        with open(self.log_file, "a") as f:
-            f.write(message + "\n")
+from typing import Optional
+from datetime import datetime
 
-# services.py (your new code)
-from fastapi_service import injectable
-from legacy_module import LegacyLogger
-
-@injectable
-class UserService:
-    def __init__(self, logger: LegacyLogger):  # Auto-injects LegacyLogger!
-        self.logger = logger
-    
-    def create_user(self, name: str):
-        self.logger.log(f"Creating user: {name}")
-        return {"name": name}
-```
-
-### 3. Data Transfer Objects (DTOs)
-
-```python
-# DTOs often don't need decorators
+# Plain DTO classes
 class UserDTO:
-    def __init__(self, name: str, email: str, age: int = 0):
-        self.name = name
+    def __init__(self, username: str, email: str, age: Optional[int] = None):
+        self.username = username
+        self.email = email
+        self.age = age
+        self.created_at = datetime.now()
+
+class CreateUserRequest:
+    def __init__(self, username: str, email: str, password: str):
+        self.username = username
+        self.email = email
+        self.password = password
+
+# Use in FastAPI endpoints
+from fastapi import FastAPI, Depends
+
+app = FastAPI()
+
+@app.post("/users")
+async def create_user(request: CreateUserRequest = Depends(CreateUserRequest)):
+    # FastAPI creates CreateUserRequest from request body
+    user_dto = UserDTO(request.username, request.email)
+    return {"username": user_dto.username, "email": user_dto.email}
+```
+
+## Validation with Plain Objects
+
+```python
+from typing import Optional
+import re
+
+class ValidatedEmail:
+    def __init__(self, email: str):
+        if not self._is_valid_email(email):
+            raise ValueError(f"Invalid email format: {email}")
+        self.email = email
+    
+    def _is_valid_email(self, email: str) -> bool:
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return re.match(pattern, email) is not None
+
+class ValidatedUser:
+    def __init__(self, username: str, email: ValidatedEmail, age: Optional[int] = None):
+        self.username = username
         self.email = email
         self.age = age
 
 @injectable
-class UserService:
-    def __init__(self, db: DatabaseService):
-        self.db = db
+class UserRegistrationService:
+    def __init__(self, email_validator: ValidatedEmail):  # Plain object
+        self.email_validator = email_validator
     
-    def get_user_dto(self, user_id: int) -> UserDTO:
-        data = self.db.query("SELECT * FROM users WHERE id = ?", user_id)
-        # UserDTO can be auto-injected elsewhere if needed
-        return UserDTO(name=data["name"], email=data["email"], age=data["age"])
+    def register_user(self, username: str, email: str):
+        try:
+            validated_email = ValidatedEmail(email)
+            # ... proceed with registration
+            return {"username": username, "email": validated_email.email}
+        except ValueError as e:
+            return {"error": str(e)}
 ```
 
-## How It Works: Auto-Resolution Process
-
-Plain injection uses runtime introspection:
+## Factory Pattern with Plain Objects
 
 ```python
-class PlainClass:
-    def __init__(self, service: DatabaseService, timeout: int = 30):
-        self.service = service
-        self.timeout = timeout
+from typing import Protocol
 
-# When resolving PlainClass:
-# 1. Inspect __init__ signature
-# 2. Get type hints: {'service': DatabaseService, 'timeout': int}
-# 3. For 'service': resolve DatabaseService (recursive)
-# 4. For 'timeout': use default value 30 (no type to resolve)
-# 5. Call PlainClass(service=resolved_db, timeout=30)
-```
+class Logger(Protocol):
+    def log(self, message: str): ...
 
-**Key insight**: The `Container._auto_resolve` method handles this transparently.
+class FileLogger:
+    def __init__(self, filename: str = "app.log"):
+        self.filename = filename
+    
+    def log(self, message: str):
+        with open(self.filename, "a") as f:
+            f.write(f"{message}\n")
 
-## Limitations and Important Caveats
+class ConsoleLogger:
+    def __init__(self, prefix: str = "LOG"):
+        self.prefix = prefix
+    
+    def log(self, message: str):
+        print(f"[{self.prefix}] {message}")
 
-### 1. Always Transient Scope
-
-```python
-# Plain classes are ALWAYS TRANSIENT scope
-class PlainService:
-    def __init__(self): pass
-
-@injectable(scope=Scopes.SINGLETON)
-class SingletonConsumer:
-    def __init__(self, plain: PlainService):  # ❌ SCOPE ERROR!
-        self.plain = plain  # Would trap transient in singleton
-
-# ERROR: Cannot inject non-singleton-scoped dependency 'PlainService' into singleton-scoped 'SingletonConsumer'
-```
-
-**Rule**: Plain classes cannot be injected into SINGLETON services because their scope is unknown and defaults to TRANSIENT.
-
-**Solution**: Make both singleton or both transient:
-
-```python
-# Option A: Both transient
-@injectable(scope=Scopes.TRANSIENT)
-class SafeConsumer:
-    def __init__(self, plain: PlainService):
-        self.plain = plain  # ✅ Both transient
-
-# Option B: Decorate the plain class
-@injectable(scope=Scopes.SINGLETON)
-class NowSingleton:
-    def __init__(self): pass
-
-@injectable(scope=Scopes.SINGLETON)
-class SafeConsumer:
-    def __init__(self, singleton: NowSingleton):
-        self.singleton = singleton  # ✅ Both singleton
-```
-
-### 2. No Scope Validation for Plain Dependencies
-
-```python
-@injectable(scope=Scopes.SINGLETON)
-class ConfigService: pass
-
-class PlainRepository:
-    def __init__(self, config: ConfigService):  # ✅ Works: config is singleton
+# Factory that creates plain objects
+@injectable
+class LoggerFactory:
+    def __init__(self, config: ConfigService):
         self.config = config
+    
+    def create_logger(self) -> Logger:
+        logger_type = self.config.get("logger_type", "console")
+        if logger_type == "file":
+            return FileLogger(self.config.get("log_file", "app.log"))
+        else:
+            return ConsoleLogger(self.config.get("log_prefix", "LOG"))
 
-@injectable
-class Service:
-    def __init__(self, repo: PlainRepository):  # ⚠️ No scope validation!
-        self.repo = repo
-```
-
-**The plain class `PlainRepository` could hold a reference to a TRANSIENT service without the system detecting it.** Decorated classes have scope safety; plain classes do not.
-
-### 3. No Token-based Resolution
-
-Plain classes cannot use token-based registration:
-
-```python
-from fastapi_service import register_injectable
-
-# This doesn't work for plain classes
-register_injectable("special_service", SomePlainClass)  # ❌ Plain classes have no token support
-
-# Only decorated classes support tokens
-@injectable(token="special_service")
-class SpecialService: pass
-```
-
-## Best Practices
-
-### ✅ DO: Use @injectable for Your Services
-
-```python
-# ✅ Good: Your services are explicit
 @injectable
 class UserService:
-    def __init__(self, db: DatabaseService):
-        self.db = db
+    def __init__(self, logger_factory: LoggerFactory):
+        self.logger = logger_factory.create_logger()
+    
+    def create_user(self, username: str):
+        self.logger.log(f"Creating user: {username}")
+        # ... create user logic
+        return {"username": username}
 ```
 
-### ✅ DO: Use Plain Injection for External Code
+## Configuration-Based Plain Objects
 
 ```python
-# ✅ Good: External class, can't modify
-import redis
+# Plain objects configured via dependency injection
+class DatabaseConnection:
+    def __init__(self, host: str, port: int = 5432, database: str = "myapp"):
+        self.host = host
+        self.port = port
+        self.database = database
+        self.connection = None
+    
+    def connect(self):
+        import psycopg2
+        self.connection = psycopg2.connect(
+            host=self.host,
+            port=self.port,
+            database=self.database
+        )
+        return self.connection
 
-class RedisCache:
-    def __init__(self, host: str = "localhost", port: int = 6379):
-        self.client = redis.Redis(host=host, port=port)
-```
-
-### ❌ DON'T: Mix Scopes Unsafely
-
-```python
-# ❌ Danger: Plain class injected into singleton
-@injectable(scope=Scopes.SINGLETON)
-class UnsafeSingleton:
-    def __init__(self, plain: PlainCache):  # PlainCache is transient
-        self.cache = plain  # Will cause stale data
-```
-
-### ✅ DO: Document Plain Dependencies
-
-```python
+# Configuration service provides connection parameters
 @injectable
-class UserService:
-    def __init__(self, db: DatabaseService, cache: "PlainCache"):
-        """
-        Args:
-            db: Injected database service
-            cache: Plain RedisCache instance (auto-resolved, transient)
-        """
-        self.db = db
-        self.cache = cache
-```
-
-### ✅ DO: Provide Defaults for Configuration
-
-```python
-# ✅ Good: Configurable via defaults
-class ConfigurableService:
-    def __init__(
-        self,
-        db: DatabaseService,
-        timeout: int = 30,
-        retries: int = 3,
-        endpoint: str = "https://api.example.com"
-    ):
-        self.db = db
-        self.timeout = timeout
-        self.retries = retries
-        self.endpoint = endpoint
+class DatabaseConnectionFactory:
+    def __init__(self, config: ConfigService):
+        self.config = config
+    
+    def create_connection(self) -> DatabaseConnection:
+        return DatabaseConnection(
+            host=self.config.get("db_host", "localhost"),
+            port=self.config.get("db_port", 5432),
+            database=self.config.get("db_name", "myapp")
+        )
 
 @injectable
-class Consumer:
-    def __init__(self, service: ConfigurableService):
-        # Uses all defaults
-        self.service = service
+class UserRepository:
+    def __init__(self, connection_factory: DatabaseConnectionFactory):
+        self.connection_factory = connection_factory
+    
+    def get_user(self, user_id: int):
+        conn = self.connection_factory.create_connection()
+        # ... use connection
+        return {"id": user_id, "name": "John Doe"}
 ```
 
 ## Testing with Plain Objects
 
-### Override Plain Classes in Tests
-
 ```python
-# conftest.py
+# test_plain_objects.py
 import pytest
 from fastapi_service import Container
-from legacy import PlainLogger
+from your_app import UserService, SimpleCache
 
-class MockLogger:
-    def log(self, message: str):
-        self.last_message = message
-
-@pytest.fixture
-def test_container():
+def test_service_with_plain_object():
     container = Container()
-    # Override plain class with mock
-    container._registry[PlainLogger] = MockLogger()
-    yield container
+    
+    # Mock the plain object
+    class MockCache:
+        def __init__(self, ttl: int = 300):
+            self.ttl = ttl
+            self._data = {}
+        
+        def get(self, key: str):
+            return self._data.get(key)
+        
+        def set(self, key: str, value: str):
+            self._data[key] = value
+    
+    # Register mock
+    container._registry[SimpleCache] = MockCache()
+    
+    # Resolve service with mocked plain object
+    user_service = container.resolve(UserService)
+    
+    # Test functionality
+    user_service.cache.set("user:1", {"id": 1, "name": "John"})
+    result = user_service.cache.get("user:1")
+    
+    assert result == {"id": 1, "name": "John"}
+    
     container.clear()
-
-# test_service.py
-def test_with_mock_logger(test_container):
-    from services import UserService
-    
-    service = test_container.resolve(UserService)
-    service.logger.log("test")
-    assert service.logger.last_message == "test"
 ```
 
-### Test Plain Classes Directly
+## Limitations of Plain Object Injection
+
+### Complex Constructor Logic
 
 ```python
-def test_plain_service():
-    # Mock dependencies manually
-    mock_db = MockDatabase()
-    
-    # Create plain instance directly
-    plain_service = PlainService(db=mock_db, timeout=10)
-    
-    assert plain_service.timeout == 10
-    assert plain_service.db is mock_db
-```
+# ❌ Won't work - complex constructor logic
+class ComplexService:
+    def __init__(self, config: ConfigService):
+        if config.get("environment") == "production":
+            self.backend = "redis"
+        else:
+            self.backend = "memory"
+        # ... more complex logic
 
-## Performance Comparison
-
-### Decorated vs Plain Resolution
-
-```python
-# Decorated service (cached metadata)
+# Use factory pattern instead
 @injectable
-class DecoratedService:
-    def __init__(self, db: DatabaseService): pass
-
-# Plain service (metadata extracted each time)
-class PlainService:
-    def __init__(self, db: DatabaseService): pass
-
-# First resolution:
-decorated = container.resolve(DecoratedService)  # ~0.05ms (cached metadata)
-plain = container.resolve(PlainService)          # ~0.08ms (extract metadata)
-
-# Subsequent resolutions:
-decorated = container.resolve(DecoratedService)  # ~0.05ms
-plain = container.resolve(PlainService)          # ~0.08ms (no caching)
+class ComplexServiceFactory:
+    def __init__(self, config: ConfigService):
+        self.config = config
+    
+    def create_service(self):
+        if self.config.get("environment") == "production":
+            return RedisService()
+        else:
+            return MemoryService()
 ```
 
-**Difference**: Negligible (~0.03ms) for most applications. Use `@injectable` for your core services, plain injection for integration.
-
-## Migration Strategy: Plain to Decorated
-
-### Step 1: Start with Plain (Legacy)
+### Circular Dependencies
 
 ```python
-# Old code in legacy.py
-class LegacyService:
-    def __init__(self, db: DatabaseService):
-        self.db = db
+# ❌ Won't work - circular dependency
+class ServiceA:
+    def __init__(self, b: ServiceB): pass
+
+class ServiceB:
+    def __init__(self, a: ServiceA): pass
+
+# Solution: Use interfaces or refactor
+class SharedService: pass
+
+class ServiceA:
+    def __init__(self, shared: SharedService): pass
+
+class ServiceB:
+    def __init__(self, shared: SharedService): pass
 ```
 
-### Step 2: Use Plain Injection (Bridge)
+### Dynamic Dependencies
 
 ```python
-# New code in services.py
-from fastapi_service import injectable
-from legacy import LegacyService
+# ❌ Won't work - dynamic dependency selection
+class DynamicService:
+    def __init__(self, service_type: str):
+        if service_type == "A":
+            self.service = ServiceA()
+        else:
+            self.service = ServiceB()
 
+# Use factory pattern instead
 @injectable
-class ModernService:
-    def __init__(self, legacy: LegacyService):
-        self.legacy = legacy  # Plain injection works!
+class DynamicServiceFactory:
+    def __init__(self, config: ConfigService):
+        self.config = config
+    
+    def create_service(self, service_type: str):
+        if service_type == "A":
+            return ServiceA()
+        else:
+            return ServiceB()
 ```
 
-### Step 3: Migrate to Decorated (Final)
+## Best Practices
+
+### ✅ DO: Use Plain Objects for Simple DTOs
 
 ```python
-# After refactoring legacy.py
-from fastapi_service import injectable
+class UserDTO:
+    def __init__(self, username: str, email: str):
+        self.username = username
+        self.email = email
+```
 
-@injectable  # Now decorated!
-class LegacyService:
-    def __init__(self, db: DatabaseService):
+### ✅ DO: Use Plain Objects for Third-Party Classes
+
+```python
+# Third-party class
+class ExternalAPIClient:
+    def __init__(self, api_key: str, timeout: int = 30):
+        self.api_key = api_key
+        self.timeout = timeout
+```
+
+### ✅ DO: Provide Defaults for Optional Parameters
+
+```python
+class ConfigurableService:
+    def __init__(self, required_service: RequiredService, optional_param: str = "default"):
+        self.required_service = required_service
+        self.optional_param = optional_param
+```
+
+### ❌ DON'T: Use Plain Objects for Core Business Services
+
+```python
+# ❌ Bad - should use @injectable
+class UserService:
+    def __init__(self, db: DatabaseService, cache: CacheService):
         self.db = db
+        self.cache = cache
 
-# services.py remains unchanged - zero breaking changes!
+# ✅ Good - explicit dependency injection
+@injectable
+class UserService:
+    def __init__(self, db: DatabaseService, cache: CacheService):
+        self.db = db
+        self.cache = cache
 ```
 
-## Debugging Plain Injection
-
-### Enable Verbose Logging
+### ❌ DON'T: Rely on Plain Objects for Complex Dependencies
 
 ```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
+# ❌ Bad - complex dependency graph
+class ComplexService:
+    def __init__(self, a: ServiceA, b: ServiceB, c: ServiceC, d: ServiceD):
+        # Too many dependencies to manage manually
+        pass
 
-# When resolving plain classes, you'll see:
-# DEBUG: Auto-resolving PlainClass
-# DEBUG: Parameter 'service' -> type DatabaseService
-# DEBUG: Resolving DatabaseService...
-# DEBUG: Parameter 'timeout' -> using default 30
+# ✅ Good - use @injectable for complex services
+@injectable
+class ComplexService:
+    def __init__(self, a: ServiceA, b: ServiceB, c: ServiceC, d: ServiceD):
+        pass
 ```
 
-### Inspect Resolution
+## Summary
 
-```python
-from fastapi_service import Container
+Plain object injection is a powerful feature for:
 
-container = Container()
+- **Third-party integration**: Use external libraries without modification
+- **Simple DTOs**: Data transfer objects and value objects
+- **Configuration objects**: Simple configuration classes
+- **Validation**: Input validation and sanitization
 
-# Check if class will be auto-resolved
-def can_auto_resolve(cls):
-    try:
-        container.resolve(cls)
-        return True
-    except Exception as e:
-        print(f"Cannot resolve {cls.__name__}: {e}")
-        return False
-
-print(can_auto_resolve(PlainService))  # True or False with reason
-```
-
-## Summary: When to Use Plain Injection
-
-| Scenario | Plain Injection | @injectable |
-|----------|----------------|-------------|
-| Your application services | ❌ No (use explicit) | ✅ Yes |
-| Third-party libraries | ✅ Yes | ❌ No (can't modify) |
-| Legacy code | ✅ Yes | ❌ No (can't modify) |
-| Simple DTOs/Value objects | ✅ Yes | ⚠️ Optional |
-| Need SINGLETON scope | ❌ No (always TRANSIENT) | ✅ Yes |
-| Need scope validation | ❌ No | ✅ Yes |
-| Need token-based resolution | ❌ No | ✅ Yes |
-
-**Rule of thumb**: Use `@injectable` for services you own. Use plain injection for code you don't control.
+Use it judiciously alongside `@injectable` for the best balance of simplicity and power.

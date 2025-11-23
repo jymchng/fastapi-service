@@ -1,6 +1,6 @@
 from typing import Protocol, Type, Dict, Any, runtime_checkable, Optional
 
-from fastapi_service.typing import _T, _TInjectable
+from fastapi_service.typing import _T, _TInjectable, _TOracle, _TMetadata
 
 
 @runtime_checkable
@@ -15,10 +15,12 @@ class ContainerProtocol(Protocol):
     """Protocol for dependency injection container."""
 
     def resolve(
-        self, dependency: Type[_TInjectable[_T]], additional_context: Dict[str, Any]
+        self,
+        dependency: _TInjectable,
+        oracle: _TOracle,
     ) -> _T: ...
 
-    def get_metadata(self, cls: Type[_T]) -> Optional["MetadataProtocol[_T]"]: ...
+    def get_metadata(self, cls: _TInjectable) -> Optional[_TMetadata]: ...
 
     def clear(self) -> None: ...
 
@@ -29,7 +31,7 @@ class MetadataProtocol(Protocol[_T]):
 
     def owned_by(
         self,
-    ) -> Type[_TInjectable[_T]]: ...
+    ) -> _TInjectable[_T]: ...
 
     def get_instance(
         self,
@@ -39,18 +41,12 @@ class MetadataProtocol(Protocol[_T]):
 
 
 @runtime_checkable
-class OracleProtocol(Protocol):
-    """Oracles magically has the solution to resolving a dependency."""
+class OracleProtocol(Protocol[_T]):
+    """Oracles magically has the solution to resolving a `dependency`."""
 
-    def can_resolve(
+    def get_context(
         self,
-        dependency: Type[_TInjectable[_T]],
-        container: ContainerProtocol,
-    ) -> bool: ...
-
-    def resolve(
-        self,
-        dependency: Type[_TInjectable[_T]],
-        container: ContainerProtocol,
-        additional_context: Dict[str, Any],
-    ) -> _T: ...
+        dependency: _TInjectable,
+    ) -> Dict[str, Any]:
+        """Oracle returns additional context for resolving a `dependency`."""
+        ...

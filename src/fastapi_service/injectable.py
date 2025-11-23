@@ -8,7 +8,6 @@ from typing import (
     overload,
     Union,
     Generic,
-    List,
 )
 import inspect
 from functools import wraps
@@ -24,6 +23,7 @@ from fastapi_service.helpers import (
 from fastapi_service.protocols import (
     ContainerProtocol,
     MetadataProtocol,
+    OracleProtocol,
 )
 from fastapi_service.typing import (
     _T,
@@ -31,9 +31,6 @@ from fastapi_service.typing import (
 )
 from fastapi_service.container import (
     Container,
-)
-from fastapi_service.additional_context_manager import (
-    AdditionalContextManager,
 )
 from fastapi_service.constants import (
     DUNDER_INIT_KEY,
@@ -43,10 +40,12 @@ from fastapi_service.constants import (
     FASTAPI_REQUEST_KEY,
 )
 from fastapi import Request
+from fastapi_service.oracle import FastAPIOracle
 
 
 def _get_injectable_metadata(
-    cls: Type[_T], container: "Optional[ContainerProtocol]" = None
+    cls: Type[_T],
+    container: "Optional[ContainerProtocol]" = None,
 ) -> "Optional[MetadataProtocol[_T]]":
     """Get injectable metadata from class."""
     if container is not None:
@@ -83,7 +82,9 @@ class _InjectableMetadata(Generic[_T]):
         return self.cls
 
     def _dep_has_invalid_scope(
-        self, dep_type: Type[_T], container: "Optional[ContainerProtocol]" = None
+        self,
+        dep_type: Type[_T],
+        container: ContainerProtocol,
     ) -> None:
         """Check if a dependency is registered as singleton scope."""
         metadata = _get_injectable_metadata(dep_type, container) or False
@@ -93,7 +94,9 @@ class _InjectableMetadata(Generic[_T]):
         )
 
     def _check_self_scope_dep_scope_are_valid(
-        self, dep_type: Type[_T], container: "Optional[ContainerProtocol]" = None
+        self,
+        dep_type: Type[_T],
+        container: ContainerProtocol,
     ) -> None:
         """Check if a dependency is registered as singleton scope."""
         if self.scope is Scopes.SINGLETON and self._dep_has_invalid_scope(
@@ -143,23 +146,21 @@ class _InjectableMetadata(Generic[_T]):
     def get_instance(
         self,
         container: "ContainerProtocol",
-        additional_context: Dict[str, Any] = None,
+        oracle: OracleProtocol[_T],
     ) -> Any:
-        additional_context = additional_context or {}
         if self.scope is Scopes.SINGLETON:
             if self._instance is None:
-                instance = self._create_instance(container, additional_context)
-                self._init_instance(instance, container, additional_context)
+                instance = self._create_instance(container, oracle)
+                self._init_instance(instance, container, oracle)
                 self._instance = instance
             return self._instance
-        instance = self._create_instance(container, additional_context)
-        self._init_instance(instance, container, additional_context)
+        instance = self._create_instance(container, oracle)
+        self._init_instance(instance, container, oracle)
         return instance
 
     def _get_resolved_dependencies_from_oracle(
         self,
-        additional_context: Dict[str, Any],
-        additional_context_manager: AdditionalContextManager,
+        oracle: OracleProtocol[_T],
     ):
         init_signature = inspect.signature(self.original_init)
         init_signature_with_first_param_removed = _remove_first_n_param_from_signature(
@@ -168,23 +169,14 @@ class _InjectableMetadata(Generic[_T]):
         fake_function_with_same_signature = _make_fake_function_with_same_signature(
             init_signature_with_first_param_removed
         )
-        additional_context = additional_context_manager.update_additional_context(
-            fake_function_with_same_signature,
-            additional_context,
-        )
-        return additional_context
+        return oracle.get_context(fake_function_with_same_signature)
 
     def _get_resolved_dependencies(
         self,
         container: "ContainerProtocol",
-        additional_context: Dict[str, Any] = None,
+        oracle: OracleProtocol[_T],
     ):
-        additional_context = additional_context or {}
-        additional_context_manager = AdditionalContextManager(additional_context)
-
-        additional_context = self._get_resolved_dependencies_from_oracle(
-            additional_context, additional_context_manager
-        )
+        additional_context = self._get_resolved_dependencies_from_oracle(oracle=oracle)
         resolved_deps = {}
 
         # using `self.dependencies` is correct because
@@ -205,12 +197,10 @@ class _InjectableMetadata(Generic[_T]):
             if default_param_value is not inspect.Parameter.empty:
                 resolved_deps[param_name] = default_param_value
                 continue
-            additional_context = additional_context_manager.update_additional_context(
-                dep_type, additional_context
-            )
             try:
                 resolved_deps[param_name] = container.resolve(
-                    dep_type, additional_context
+                    dep_type,
+                    oracle,
                 )
             except Exception as err:
                 dep_type_name = getattr(
@@ -225,13 +215,14 @@ class _InjectableMetadata(Generic[_T]):
         return resolved_deps
 
     def _create_instance(
-        self, container: "ContainerProtocol", additional_context: Dict[str, Any] = None
+        self,
+        container: "ContainerProtocol",
+        oracle: OracleProtocol[_T],
     ) -> _T:
-        additional_context = additional_context or {}
         if self.original_new is not OBJECT_NEW_FUNC:
             instance = self.original_new(
                 self.cls,
-                **(self._get_resolved_dependencies(container, additional_context)),
+                **(self._get_resolved_dependencies(container=container, oracle=oracle)),
             )
         else:
             instance = self.original_new(self.cls)
@@ -241,12 +232,11 @@ class _InjectableMetadata(Generic[_T]):
         self,
         instance: _T,
         container: "ContainerProtocol",
-        additional_context: Dict[str, Any] = None,
+        oracle: "OracleProtocol[_T]",
     ) -> _T:
-        additional_context = additional_context or {}
         if self.original_init is not OBJECT_INIT_FUNC:
             resolved_deps = self._get_resolved_dependencies(
-                container, additional_context
+                container=container, oracle=oracle
             )
             self.original_init(instance, **resolved_deps)
         else:
@@ -304,7 +294,8 @@ def injectable(
             return OBJECT_NEW_FUNC(subcls)
         # the actual `_cls`
         container = Container()
-        return container.resolve(_cls, kwargs)
+        oracle = FastAPIOracle(kwargs.pop(FASTAPI_REQUEST_KEY))
+        return container.resolve(_cls, oracle=oracle)
 
     @wraps(original_init)
     def factory_init(instance, *args, **kwargs):

@@ -2,6 +2,7 @@ import pytest
 from fastapi import FastAPI, Request, Path
 from fastapi.testclient import TestClient
 from fastapi_service.constants import FASTAPI_REQUEST_KEY
+from fastapi_service.oracle import FastAPIOracle
 
 
 def test_container_unregistered_dependency_error(container):
@@ -55,7 +56,11 @@ def test_container_function_default_value_skips(container):
     def f(a: int = 1):
         return a
 
-    result = container.resolve(f, {"a": 0})
+    class FakeOracle:
+        def get_context(self, dependency):
+            return {"a": 0}
+
+    result = container.resolve(f, oracle=FakeOracle())
     assert result == 0
 
 
@@ -70,7 +75,7 @@ def test_container_auto_resolve_with_fastapi_request_values(container):
 
     @app.get("/user/{name}")
     def route(request: Request, name: str):
-        inst = container.resolve(RequestPlain, {FASTAPI_REQUEST_KEY: request})
+        inst = container.resolve(RequestPlain, oracle=FastAPIOracle(request))
         return {"name": inst.name, "client": bool(inst.client)}
 
     body = client.get("/user/Alice").json()
