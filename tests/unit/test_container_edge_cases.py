@@ -1,7 +1,6 @@
 import pytest
 from fastapi import FastAPI, Request, Path
 from fastapi.testclient import TestClient
-from fastapi_service.constants import FASTAPI_REQUEST_KEY
 from fastapi_service.oracle import FastAPIOracle
 
 

@@ -3,14 +3,16 @@ import asyncio
 from dataclasses import dataclass
 
 from fastapi import Request
-from fastapi_service.constants import FASTAPI_REQUEST_KEY
 from fastapi_service.helpers import get_solved_dependencies
 from fastapi_service.typing import _T, _TInjectable, _TOracle
 
 
 @dataclass
 class FastAPIOracle:
-    __fastapi_request__: Optional[Request] = None
+    __slots__ = (
+        "__fastapi_request__",
+        "dependency_cache",
+    )
 
     def __init__(self, request: Request):
         self.__fastapi_request__ = request

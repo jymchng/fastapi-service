@@ -37,7 +37,6 @@ from fastapi_service.constants import (
     DUNDER_NEW_KEY,
     OBJECT_INIT_FUNC,
     OBJECT_NEW_FUNC,
-    FASTAPI_REQUEST_KEY,
 )
 from fastapi import Request
 from fastapi_service.oracle import FastAPIOracle
@@ -273,10 +272,12 @@ def injectable(
     metadata = _InjectableMetadata._from_class(klass=_cls, scope=scope)
     _cls.__injectable_metadata__ = metadata
 
+    fastapi_request_key = f"fastapi_request_key_{id(object())}"
+
     @staticmethod
     @wraps(original_new)
     def factory_new(cls_or_subcls, *args, **kwargs):
-        if FASTAPI_REQUEST_KEY not in kwargs:
+        if fastapi_request_key not in kwargs:
             # means we are instantiating it as a normal ass
             if original_new is not OBJECT_NEW_FUNC:
                 return original_new(cls_or_subcls, *args, **kwargs)
@@ -289,24 +290,24 @@ def injectable(
             if original_new is not OBJECT_NEW_FUNC:
                 # `Depends` can still inject the `Request` object into `**kwargs`
                 # so we take it out
-                kwargs.pop(FASTAPI_REQUEST_KEY, None)
+                kwargs.pop(fastapi_request_key, None)
                 return original_new(subcls, *args, **kwargs)
             return OBJECT_NEW_FUNC(subcls)
         # the actual `_cls`
         container = Container()
-        oracle = FastAPIOracle(kwargs.pop(FASTAPI_REQUEST_KEY))
+        oracle = FastAPIOracle(kwargs.pop(fastapi_request_key))
         return container.resolve(_cls, oracle=oracle)
 
     @wraps(original_init)
     def factory_init(instance, *args, **kwargs):
-        if FASTAPI_REQUEST_KEY not in kwargs:
+        if fastapi_request_key not in kwargs:
             # means we are instantiating it as a normal ass
             if original_new is not OBJECT_INIT_FUNC:
                 return original_init(instance, *args, **kwargs)
             return OBJECT_INIT_FUNC(instance)
         if type(instance) is not _cls:
             if original_new is not OBJECT_INIT_FUNC:
-                kwargs.pop(FASTAPI_REQUEST_KEY, None)
+                kwargs.pop(fastapi_request_key, None)
                 return original_init(instance, *args, **kwargs)
             return OBJECT_INIT_FUNC(instance)
 
@@ -320,7 +321,7 @@ def injectable(
                 annotation=_cls,
             ),
             inspect.Parameter(
-                FASTAPI_REQUEST_KEY,
+                fastapi_request_key,
                 inspect.Parameter.KEYWORD_ONLY,
                 default=inspect.Parameter.empty,
                 annotation=Request,
