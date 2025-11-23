@@ -1,4 +1,5 @@
 from typing import Protocol, Dict, Any, runtime_checkable, Optional
+from inspect import Signature
 
 from fastapi_service.typing import _T, _TInjectable, _TOracle, _TMetadata
 
@@ -50,3 +51,11 @@ class OracleProtocol(Protocol[_T]):
     ) -> Dict[str, Any]:
         """Oracle returns additional context for resolving a `dependency`."""
         ...
+
+
+@runtime_checkable
+class HasSignature(Protocol):
+    
+    __signature__: Signature
+    
+

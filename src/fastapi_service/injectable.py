@@ -44,7 +44,7 @@ from fastapi_service.oracle import FastAPIOracle
 
 
 def _get_injectable_metadata(
-    cls: Type[_T],
+    cls: _TInjectable[_T],
     container: "Optional[ContainerProtocol]" = None,
 ) -> "Optional[MetadataProtocol[_T]]":
     """Get injectable metadata from class."""
@@ -63,7 +63,7 @@ class _InjectableMetadata(Generic[_T]):
 
     cls: Type[_T]
     scope: Scopes = Scopes.TRANSIENT
-    dependencies: Dict[str, Type] = field(default_factory=dict)
+    dependencies: Dict[str, Any] = field(default_factory=dict)
     original_init: Optional[Callable] = None
     original_init_params: Optional[Dict[str, inspect.Parameter]] = field(
         default_factory=dict
@@ -83,27 +83,30 @@ class _InjectableMetadata(Generic[_T]):
 
     def _dep_has_invalid_scope(
         self,
-        dep_type: Type[_T],
+        dep_type: _TInjectable[_T],
         container: ContainerProtocol,
-    ) -> None:
+    ) -> bool:
         """Check if a dependency is registered as singleton scope."""
         metadata = _get_injectable_metadata(dep_type, container) or False
         return not metadata or (
             isinstance(metadata, _InjectableMetadata)
-            and metadata.scope > Scopes.SINGLETON
+            and metadata.scope > self.scope
         )
 
     def _check_self_scope_dep_scope_are_valid(
         self,
-        dep_type: Type[_T],
+        dep_type: _TInjectable[_T],
         container: ContainerProtocol,
     ) -> None:
         """Check if a dependency is registered as singleton scope."""
         if self.scope is Scopes.SINGLETON and self._dep_has_invalid_scope(
             dep_type, container
         ):
+            dep_type_name = getattr(
+                dep_type, "__name__", "<unknown>" if dep_type else repr(dep_type)
+            )
             raise ValueError(
-                f"Cannot inject non-singleton-scoped dependency '{dep_type.__name__}' "
+                f"Cannot inject non-singleton-scoped dependency '{dep_type_name}' "
                 f"into singleton-scoped '{self.cls.__name__}'"
             )
 
@@ -204,7 +207,7 @@ class _InjectableMetadata(Generic[_T]):
                 )
             except Exception as err:
                 dep_type_name = getattr(
-                    dep_type, "__name__", "<unknown>" if dep_type else dep_type
+                    dep_type, "__name__", "<unknown>" if dep_type else repr(dep_type)
                 )
                 raise ValueError(
                     f"Parameter with name `{param_name}` and type hint `{dep_type_name}`"

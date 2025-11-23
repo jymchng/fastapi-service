@@ -36,14 +36,14 @@ from fastapi_service.oracle import NullOracle
 class Container:
     """Dependency injection container."""
 
-    _registry: Dict[Type, MetadataProtocol[_T]] = field(default_factory=dict)
-    _instances: Dict[Type[_TInjectable[_T]], _T] = field(default_factory=dict)
+    _registry: Dict[_TInjectable, MetadataProtocol] = field(default_factory=dict)
+    _instances: Dict[_TInjectable, Any] = field(default_factory=dict)
     _resolving: set = field(
         default_factory=set
     )  # Track currently resolving dependencies
     _token_metadata_registry: Dict[str, MetadataProtocol] = field(default_factory=dict)
 
-    def get_metadata(self, cls: Type[_T]) -> Optional["MetadataProtocol[_T]"]:
+    def get_metadata(self, cls: _TInjectable) -> Optional["MetadataProtocol"]:
         """Get injectable metadata from class."""
         if cls in self._registry:
             return self._registry[cls]
@@ -53,8 +53,8 @@ class Container:
 
     def resolve(
         self,
-        dependency: Type[_TInjectable[_T]],
-        oracle: "OracleProtocol[_T]" = NullOracle(),
+        dependency: _TInjectable,
+        oracle: OracleProtocol = NullOracle(),
     ) -> _T:
         if dependency in self._resolving:
             chain = " -> ".join([d.__name__ for d in self._resolving])

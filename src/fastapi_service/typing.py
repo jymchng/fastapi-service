@@ -10,14 +10,16 @@ if TYPE_CHECKING:
         OracleProtocol,
     )
 
+_T_co = TypeVar("_T_co", covariant=True)
+_T_contra = TypeVar("_T_contra", contravariant=True)
 _T = TypeVar("_T")
 
 
-_TOracle = TypeVar("_TOracle", bound="OracleProtocol[_T]")
+_TOracle = TypeVar("_TOracle", bound="OracleProtocol")
 """`_TOracle` is a type variable bound to `OracleProtocol`."""
 
 
-_TMetadata = TypeVar("_TMetadata", bound="MetadataProtocol[_T]")
+_TMetadata = TypeVar("_TMetadata", bound="MetadataProtocol")
 """`_TMetadata` is a type variable bound to `MetadataProtocol`."""
 
 
