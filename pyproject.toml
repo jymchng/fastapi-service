@@ -25,3 +25,35 @@ examples = [
     "fastapi>=0.121.2",
     "typing-extensions>=4.15.0",
 ]
+
+[tool.ruff]
+exclude = ["examples", "docs", "scripts", "scripts/*", "noxfile.py", "tests"]
+
+[tool.pylint]
+disable = [
+    "C0111",  # missing-docstring
+    "C0103",  # invalid-name
+    "W0511",  # fixme
+    "R0903",  # too-few-public-methods
+    "R0913",  # too-many-arguments
+    "R0914",  # too-many-locals
+    "W0212",  # protected-access
+    "W0703",  # broad-except
+    "E0401",  # import-error
+]
+extension-pkg-whitelist = ["pydantic"]
+good-names = ["i", "j", "k", "ex", "Run", "_", "id", "U"]
+max-line-length = 110
+ignore-patterns = ["^\\.#"]
+ignore-paths = ["tests/", "examples/", "docs/", "scripts/"]
+
+
+[tool.mypy]
+mypy_path = "src"
+disable_error_code = [
+    "import-not-found",
+]
+
+
+[tool.pyright]
+reportMissingImports = "none"

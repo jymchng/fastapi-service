@@ -13,6 +13,8 @@ import inspect
 from functools import wraps
 from dataclasses import dataclass, field
 
+from fastapi import Request
+
 from fastapi_service.enums import Scopes
 from fastapi_service.helpers import (
     _is_injectable_instance,
@@ -38,7 +40,6 @@ from fastapi_service.constants import (
     OBJECT_INIT_FUNC,
     OBJECT_NEW_FUNC,
 )
-from fastapi import Request
 from fastapi_service.oracle import FastAPIOracle
 
 
@@ -305,7 +306,8 @@ def injectable(
             if original_new is not OBJECT_INIT_FUNC:
                 return original_init(instance, *args, **kwargs)
             return OBJECT_INIT_FUNC(instance)
-        if type(instance) is not _cls:
+        # we need to check that `instance` is definitely not a value of a subclass of `_cls`
+        if type(instance) is not _cls:  # pylint: disable=unidiomatic-typecheck
             if original_new is not OBJECT_INIT_FUNC:
                 kwargs.pop(fastapi_request_key, None)
                 return original_init(instance, *args, **kwargs)

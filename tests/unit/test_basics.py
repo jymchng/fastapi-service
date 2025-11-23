@@ -201,7 +201,6 @@ def test_complex_dependency_tree():
 
 def test_fastapi_integration():
     """Test FastAPI Depends integration."""
-    from fastapi import Path
 
     def get_db_connection() -> "DBConnection":
         return DBConnection()

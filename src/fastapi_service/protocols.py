@@ -1,4 +1,4 @@
-from typing import Protocol, Type, Dict, Any, runtime_checkable, Optional
+from typing import Protocol, Dict, Any, runtime_checkable, Optional
 
 from fastapi_service.typing import _T, _TInjectable, _TOracle, _TMetadata
 

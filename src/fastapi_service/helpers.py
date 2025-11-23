@@ -1,7 +1,7 @@
 import json
 import re
 from contextlib import AsyncExitStack
-from typing import Any, Callable, Optional, Type, Dict
+from typing import Any, Callable, Optional, Dict
 import email.message
 import inspect
 from typing_extensions import TypeIs
@@ -19,7 +19,6 @@ from fastapi.dependencies.utils import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import compile_path, get_name
 from fastapi_service.protocols import InjectableProtocol
-from fastapi_service.typing import _T
 
 
 def _make_fake_function_with_same_signature(

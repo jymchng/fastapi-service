@@ -9,3 +9,5 @@ __all__ = [
     "Container",
     "Scopes",
 ]
+
+__version__ = "0.1.0"

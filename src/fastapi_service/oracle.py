@@ -1,10 +1,10 @@
-from typing import Optional, Dict, Any, Type
+from typing import Dict, Any
 import asyncio
 from dataclasses import dataclass
 
 from fastapi import Request
 from fastapi_service.helpers import get_solved_dependencies
-from fastapi_service.typing import _T, _TInjectable, _TOracle
+from fastapi_service.typing import _TInjectable
 
 
 @dataclass
@@ -42,7 +42,7 @@ class NullOracle:
 
     def get_context(
         self,
-        dependency: _TInjectable,
+        _: _TInjectable,
     ) -> Dict[str, Any]:
         """Oracle returns additional context for resolving a `dependency`."""
         return {}
