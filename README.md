@@ -44,8 +44,10 @@ https://github.com/jymchng/fastapi-service
 <a href="https://github.com/jymchng/fastapi-service/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jymchng/fastapi-service" alt="License"></a>
 <a href="https://codecov.io/github/jymchng/fastapi-service?branch=main"><img src="https://codecov.io/github/jymchng/fastapi-service/coverage.svg?branch=main" alt="Coverage"></a>
 
-</div>
+
 **Effortless Dependency Injection for FastAPI.**
+
+</div>
 
 `fastapi-service` is a lightweight, zero-boilerplate dependency injection library designed specifically for FastAPI. It bridges the gap between complex enterprise DI containers and FastAPI's native `Depends` system, making your code cleaner, more testable, and easier to migrate.
 
