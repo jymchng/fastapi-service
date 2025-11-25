@@ -1,9 +1,50 @@
-# FastAPI Service
+<div align="center">
+<p>
+<a href="https://fastapi-service.asyncmove.com">
+<img src="https://github.com/jymchng/fastapi-service/raw/main/assets/Fastapi-service-with-name_1-1.png" width=80% height=20%></img>
+</a>
+</p>
 
-[](https://www.google.com/search?q=https://badge.fury.io/py/fastapi-service)
-[](https://opensource.org/licenses/MIT)
-[](https://www.python.org/downloads/)
 
+<i>Decorate super simple <pre>@injectable</pre> on your FastAPI services.</i>
+
+<hr style="border: none; border-top: 1px solid #ccc; margin: 1em 0;">
+
+<div align="left">
+Documentation: <a href="https://docs.fastapi-service.asyncmove.com">
+https://docs.fastapi-service.asyncmove.com
+</a><br>
+Source Code: <a href="https://github.com/jymchng/fastapi-service">
+https://github.com/jymchng/fastapi-service
+</a>
+</div>
+<hr style="border: none; border-top: 1px solid #ccc; margin: 1em 0;">
+
+### Compatibility and Version
+<img src="https://img.shields.io/pypi/pyversions/fastapi-service?color=green" alt="Python compat">
+<a href="https://pypi.python.org/pypi/fastapi-service"><img src="https://img.shields.io/pypi/v/fastapi-service.svg" alt="PyPi"></a>
+
+### Statistics
+<a href="https://github.com/jymchng/fastapi-service/stargazers"><img src="https://img.shields.io/github/stars/jymchng/fastapi-service" alt="Stars"></a>
+<a href="https://github.com/jymchng/fastapi-service/network/members"><img src="https://img.shields.io/github/forks/jymchng/fastapi-service" alt="Forks"></a>
+<a href="https://pypi.python.org/pypi/fastapi-service"><img src="https://img.shields.io/pypi/dm/fastapi-service" alt="Downloads"></a>
+<a href="https://github.com/jymchng/fastapi-service/graphs/contributors"><img src="https://img.shields.io/github/contributors/jymchng/fastapi-service" alt="Contributors"></a>
+
+### Development and Quality
+<a href="https://github.com/jymchng/fastapi-service/commits/main"><img src="https://img.shields.io/github/commit-activity/m/jymchng/fastapi-service" alt="Commits"></a>
+<a href="https://github.com/jymchng/fastapi-service/commits/main"><img src="https://img.shields.io/github/last-commit/jymchng/fastapi-service" alt="Last Commit"></a>
+<a href="https://github.com/jymchng/fastapi-service"><img src="https://img.shields.io/github/languages/code-size/jymchng/fastapi-service" alt="Code Size"></a>
+<a href="https://github.com/jymchng/fastapi-service"><img src="https://img.shields.io/github/repo-size/jymchng/fastapi-service" alt="Repo Size"></a>
+<a href="https://github.com/jymchng/fastapi-service/watchers"><img src="https://img.shields.io/github/watchers/jymchng/fastapi-service" alt="Watchers"></a>
+<a href="https://github.com/jymchng/fastapi-service"><img src="https://img.shields.io/github/commit-activity/y/jymchng/fastapi-service" alt="Activity"></a>
+<a href="https://github.com/jymchng/fastapi-service/pulls"><img src="https://img.shields.io/github/issues-pr/jymchng/fastapi-service" alt="PRs"></a>
+<a href="https://github.com/jymchng/fastapi-service/pulls?q=is%3Apr+is%3Aclosed"><img src="https://img.shields.io/github/issues-pr-closed/jymchng/fastapi-service" alt="Merged PRs"></a>
+<a href="https://github.com/jymchng/fastapi-service/pulls?q=is%3Apr+is%3Aopen"><img src="https://img.shields.io/github/issues-pr/open/jymchng/fastapi-service" alt="Open PRs"></a>
+<a href="https://github.com/jymchng/fastapi-service/issues?q=is%3Aissue+is%3Aclosed"><img src="https://img.shields.io/github/issues-closed/jymchng/fastapi-service" alt="Closed Issues"></a>
+<a href="https://github.com/jymchng/fastapi-service/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jymchng/fastapi-service" alt="License"></a>
+<a href="https://codecov.io/github/jymchng/fastapi-service?branch=main"><img src="https://codecov.io/github/jymchng/fastapi-service/coverage.svg?branch=main" alt="Coverage"></a>
+
+</div>
 **Effortless Dependency Injection for FastAPI.**
 
 `fastapi-service` is a lightweight, zero-boilerplate dependency injection library designed specifically for FastAPI. It bridges the gap between complex enterprise DI containers and FastAPI's native `Depends` system, making your code cleaner, more testable, and easier to migrate.
@@ -23,8 +64,19 @@ FastAPI's dependency injection is powerful, but as your application grows, manag
 
 ## 📦 Installation
 
+PIP
 ```bash
 pip install fastapi-service
+```
+
+UV
+```bash
+uv add fastapi-service
+```
+
+POETRY
+```bash
+poetry add fastapi-service
 ```
 
 -----
