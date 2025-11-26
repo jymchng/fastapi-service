@@ -5,9 +5,9 @@ from typing import Any, Callable, Optional, Dict
 import email.message
 import inspect
 from typing_extensions import TypeIs
+import asyncio
 
 from fastapi import HTTPException, Request, params
-from fastapi._compat import ModelField, Undefined
 from fastapi.dependencies.models import Dependant
 from fastapi.dependencies.utils import (
     _should_embed_body_fields,
@@ -17,8 +17,9 @@ from fastapi.dependencies.utils import (
     solve_dependencies,
 )
 from fastapi.exceptions import RequestValidationError
-from fastapi.routing import compile_path, get_name
+from starlette.routing import compile_path, get_name
 from fastapi_service.protocols import InjectableProtocol
+from fastapi_service.enums import UNDEFINED
 
 
 def _make_fake_function_with_same_signature(
@@ -66,7 +67,7 @@ def generate_unique_id_for_dependant(dependant: Dependant, path_format: str):
 
 async def get_body_field_should_embed_from_request(
     dependant: Dependant, path_format: str
-) -> tuple[Optional[ModelField], bool]:
+) -> tuple[Optional["ModelField"], bool]:
     flat_dependant = get_flat_dependant(dependant)
     embed_body_fields = _should_embed_body_fields(flat_dependant.body_params)
     body_field = get_body_field(
@@ -78,7 +79,7 @@ async def get_body_field_should_embed_from_request(
 
 
 async def get_body_from_request(
-    request: Request, body_field: Optional[ModelField] = None
+    request: Request, body_field: Optional["ModelField"] = None
 ):
     body: Any = None
     is_body_form = body_field and isinstance(body_field.field_info, params.Form)
@@ -92,7 +93,7 @@ async def get_body_from_request(
                 else:
                     body_bytes = await request.body()
                     if body_bytes:
-                        json_body: Any = Undefined
+                        json_body: Any = UNDEFINED
                         content_type_value = request.headers.get("content-type")
                         if not content_type_value:
                             json_body = await request.json()
@@ -103,7 +104,7 @@ async def get_body_from_request(
                                 subtype = message.get_content_subtype()
                                 if subtype == "json" or subtype.endswith("+json"):
                                     json_body = await request.json()
-                        if json_body != Undefined:
+                        if json_body != UNDEFINED:
                             body = json_body
                         else:
                             body = body_bytes
@@ -159,3 +160,12 @@ async def get_solved_dependencies(
 def _is_injectable_instance(obj: Any) -> TypeIs[InjectableProtocol]:
     """Check if an object is an instance of an injectable class."""
     return isinstance(obj, InjectableProtocol)
+
+
+def _await_coroutine(coro):
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    else:
+        return loop.run_until_complete(coro)

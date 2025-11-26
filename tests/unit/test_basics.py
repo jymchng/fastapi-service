@@ -858,3 +858,48 @@ def test_work_with_default_args():
 
     assert svc.num1 == 69
     assert svc.num2 == 70
+
+
+# def test_can_still_instantiate_regularly_two():
+
+#     @injectable
+#     class ConfigService:
+
+#         def __init__(self):
+#             self.configs = {
+#                 "setting1": "value1",
+#                 "setting2": "value2",
+#             }
+
+#     TEST_NUMBER = 69
+
+#     class TransientService:
+#         def __init__(self, cfg: ConfigService, num=Depends(lambda: TEST_NUMBER), num1=TEST_NUMBER):
+#             self.id = id(self)
+#             self.num = num
+#             self.num1 = num1
+#             self.cfg = cfg
+
+#     @injectable
+#     class TransientServiceTwo:
+#         def __init__(self, transient: TransientService):
+#             self.transient = transient
+
+#     app = FastAPI()
+
+#     @app.get("/test")
+#     def test_route(svc=Depends(TransientServiceTwo)):
+#         return {
+#             "num": svc.transient.num,
+#             "num1": svc.transient.num1,
+#         }
+
+#     testclient = TestClient(app)
+#     assert testclient.get("/test").json() == {"num": TEST_NUMBER, "num1": TEST_NUMBER}
+
+#     transient_svc = TransientService(70)
+#     assert transient_svc.num == 70
+#     assert transient_svc.num1 == TEST_NUMBER
+#     transient_svc_two = TransientServiceTwo(transient_svc)
+
+#     assert transient_svc_two.transient.num == 70

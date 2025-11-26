@@ -55,7 +55,4 @@ class OracleProtocol(Protocol[_T]):
 
 @runtime_checkable
 class HasSignature(Protocol):
-    
     __signature__: Signature
-    
-

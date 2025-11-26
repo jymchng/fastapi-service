@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, auto
 
 
 class Scopes(int, Enum):
@@ -7,3 +7,16 @@ class Scopes(int, Enum):
 
     TRANSIENT = 40
     """Use and throw away."""
+
+
+class UndefinedType(Enum):
+    UNDEFINED = auto()
+
+    def __bool__(self):
+        return False
+
+    def __repr__(self):
+        return "UNDEFINED"
+
+
+UNDEFINED = UndefinedType.UNDEFINED

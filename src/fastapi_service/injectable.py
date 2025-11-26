@@ -89,8 +89,7 @@ class _InjectableMetadata(Generic[_T]):
         """Check if a dependency is registered as singleton scope."""
         metadata = _get_injectable_metadata(dep_type, container) or False
         return not metadata or (
-            isinstance(metadata, _InjectableMetadata)
-            and metadata.scope > self.scope
+            isinstance(metadata, _InjectableMetadata) and metadata.scope > self.scope
         )
 
     def _check_self_scope_dep_scope_are_valid(
@@ -169,10 +168,14 @@ class _InjectableMetadata(Generic[_T]):
         init_signature_with_first_param_removed = _remove_first_n_param_from_signature(
             init_signature
         )
-        fake_function_with_same_signature = _make_fake_function_with_same_signature(
-            init_signature_with_first_param_removed
-        )
-        return oracle.get_context(fake_function_with_same_signature)
+        returned_context = {}
+        for param in init_signature_with_first_param_removed.parameters.values():
+            fake_function_with_same_signature = _make_fake_function_with_same_signature(
+                inspect.Signature([param])
+            )
+            additional_context = oracle.get_context(fake_function_with_same_signature)
+            returned_context.update(additional_context)
+        return returned_context
 
     def _get_resolved_dependencies(
         self,
